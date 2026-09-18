@@ -54,7 +54,7 @@ const TIMINGS = {
 // ───────────────────────────── база ─────────────────────────────
 
 mkdirSync(join(ROOT, 'data'), { recursive: true })
-const db = new Database(join(ROOT, 'data', 'demo.db'))
+const db = new Database(env.DEMO_DB || join(ROOT, 'data', 'demo.db'))
 db.pragma('journal_mode = WAL')
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -87,12 +87,16 @@ CREATE TABLE IF NOT EXISTS evenings (
 CREATE TABLE IF NOT EXISTS file_ids (slug TEXT PRIMARY KEY, file_id TEXT NOT NULL);
 `)
 
+// База могла быть создана до появления колонки — добавляем на месте, без миграций.
+const hasKind = (db.prepare("PRAGMA table_info(users)").all() as { name: string }[]).some((c) => c.name === 'cur_kind')
+if (!hasKind) db.exec("ALTER TABLE users ADD COLUMN cur_kind TEXT NOT NULL DEFAULT 'evening'")
+
 type User = {
   tg_id: number; tz_offset_min: number; evening_time: string; state: string
   due_at: number | null; due_kind: string | null; evening_no: number; demo: number
   quiz_sum: number | null; quiz_index: number | null
   cur_before: number | null; cur_category: string | null; cur_practice: string | null
-  practice_msg_id: number | null; created_at: number
+  cur_kind: string; practice_msg_id: number | null; created_at: number
 }
 
 const q = {
@@ -108,6 +112,10 @@ const q = {
 }
 
 const now = () => Math.floor(Date.now() / 1000)
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Пауза между финальными сообщениями. В тестах нулевая, чтобы не ждать впустую. */
+const PACING_MS = env.SEVEN_NIGHTS_NO_POLL ? 0 : 2500
 
 function user(tgId: number): User {
   let u = q.get.get(tgId) as User | undefined
@@ -360,7 +368,7 @@ async function askBefore(tgId: number) {
   const n = u.evening_no + 1
   const text =
     n === 1 ? T.beforeFirst : n === 4 ? T.beforeHalf : n === 7 ? T.beforeLast : T.before(n)
-  set(tgId, { state: 'awaiting_before', due_at: null, due_kind: null })
+  set(tgId, { state: 'awaiting_before', due_at: null, due_kind: null, cur_kind: 'evening' })
   await bot.api.sendMessage(tgId, text, { reply_markup: numbers() })
 }
 
@@ -371,7 +379,10 @@ async function sendPractice(tgId: number, category: string) {
     await bot.api.sendMessage(tgId, 'Практики ещё загружаются. Загляни чуть позже.')
     return
   }
-  const n = u.evening_no + 1
+  // Сессия «Практика сейчас» живёт вне семи вечеров: счётчик она не двигает,
+  // в историю пишется с номером ноль и на график недели не попадает.
+  const isNow = u.cur_kind === 'now'
+  const n = isNow ? u.evening_no : u.evening_no + 1
   await bot.api.sendChatAction(tgId, 'upload_voice')
 
   const cached = (q.getFileId.get(p.slug) as { file_id: string } | undefined)?.file_id
@@ -379,16 +390,16 @@ async function sendPractice(tgId: number, category: string) {
   const msg = await bot.api.sendAudio(tgId, audio, {
     caption: T.caption(p, n),
     title: p.title,
-    performer: `Семь ночей · Вечер ${n}`,
+    performer: isNow ? 'Семь ночей' : `Семь ночей · Вечер ${n}`,
     duration: p.duration,
     reply_markup: new InlineKeyboard().text('Готово', 'done'),
   })
   if (!cached && msg.audio?.file_id) q.putFileId.run(p.slug, msg.audio.file_id)
 
   // Вечер засчитан в момент успешной отправки аудио — не по кнопке и не по замеру «после».
-  q.addEvening.run(tgId, n, category, p.slug, u.cur_before, now())
+  q.addEvening.run(tgId, isNow ? 0 : n, category, p.slug, u.cur_before, now())
   set(tgId, {
-    state: 'practicing', evening_no: n, cur_practice: p.slug, practice_msg_id: msg.message_id,
+    state: 'practicing', evening_no: isNow ? u.evening_no : n, cur_practice: p.slug, practice_msg_id: msg.message_id,
     due_at: now() + Math.max(timings(u).afterPracticeSec, u.demo ? 0 : p.duration + 120),
     due_kind: 'after',
   })
@@ -409,6 +420,14 @@ async function closeEvening(tgId: number, after: number) {
   const before = u.cur_before ?? after
   const delta = after > before ? T.deltaUp(before, after) : after === before ? T.deltaSame : T.deltaDown(before, after)
 
+  if (u.cur_kind === 'now') {
+    await bot.api.sendMessage(tgId, `Записала: ${after}  ${bar(after)}\n${delta}`, { reply_markup: HOME })
+    // Возвращаемся туда, где человек был: программа не сдвинулась ни на шаг.
+    const back = u.evening_no >= 7 ? 'completed' : 'idle'
+    set(tgId, { state: back, cur_before: null, cur_category: null, cur_kind: 'evening' })
+    return
+  }
+
   if (u.evening_no >= 7) {
     await bot.api.sendMessage(tgId, T.finalClose(after, delta), { reply_markup: { remove_keyboard: true } })
     await bot.api.sendChatAction(tgId, 'upload_photo')
@@ -420,9 +439,10 @@ async function closeEvening(tgId: number, after: number) {
     await bot.api.sendPhoto(tgId, new InputFile(png, 'seven-nights.png'), {
       caption: T.chartCaption(firstBefore, lastAfter),
     })
-    setTimeout(() => {
-      bot.api.sendMessage(tgId, T.invite, { reply_markup: HOME }).catch(() => {})
-    }, 3000)
+    // Пауза перед приглашением — ради ритма, но внутри того же обработчика:
+    // отложенный setTimeout пережил бы не всякий перезапуск, а сообщение потерялось бы.
+    await sleep(PACING_MS)
+    await bot.api.sendMessage(tgId, T.invite, { reply_markup: HOME })
     set(tgId, { state: 'completed', due_at: null, due_kind: null, cur_before: null })
     return
   }
@@ -506,7 +526,7 @@ bot.on('message:text', async (ctx) => {
 
   if (text === 'Практика сейчас') {
     if (u.state === 'idle' || u.state === 'completed') {
-      set(tgId, { state: 'awaiting_before' })
+      set(tgId, { state: 'awaiting_before', cur_kind: 'now' })
       await ctx.reply('Как ты сейчас, от 0 до 10?', { reply_markup: numbers() })
       return
     }
@@ -550,10 +570,7 @@ bot.on('message:text', async (ctx) => {
       if (n === 'out-of-range') return void ctx.reply(T.range, { reply_markup: numbers() })
       set(tgId, { cur_before: n, state: 'awaiting_state' })
       const evening = new Date(localNow(u) * 1000).getUTCHours() >= 14
-      await ctx.reply(T.beforeAck(n), { reply_markup: { remove_keyboard: true } })
-      await ctx.reply('​', { reply_markup: categoryKeyboard(evening) }).catch(async () => {
-        await ctx.reply('Что сегодня ближе?', { reply_markup: categoryKeyboard(evening) })
-      })
+      await ctx.reply(T.beforeAck(n), { reply_markup: categoryKeyboard(evening) })
       return
     }
     case 'practicing': {
@@ -586,7 +603,7 @@ bot.on('message:text', async (ctx) => {
  * Единственный источник отложенных действий — колонка due_at в базе.
  * Таймеров в памяти нет: перезапуск процесса ничего не теряет.
  */
-setInterval(async () => {
+export const tick = async () => {
   const rows = q.due.all(now()) as User[]
   for (const u of rows) {
     try {
@@ -601,19 +618,25 @@ setInterval(async () => {
       console.error('тик планировщика:', e instanceof Error ? e.message : e)
     }
   }
-}, 15_000)
+}
 
 // ───────────────────────────── запуск ─────────────────────────────
 
-process.title = 'seven-nights-demo'
+export { bot, db, user, set, q }
 
-bot.api.setMyCommands([]).catch(() => {})
-bot.catch((err) => console.error('ошибка бота:', err.message))
+// Под тестом модуль импортируют, чтобы прогнать путь фейковыми апдейтами: тогда ни
+// polling, ни таймер, ни обращения к Telegram при старте не нужны.
+if (!env.SEVEN_NIGHTS_NO_POLL) {
+  process.title = 'seven-nights-demo'
+  setInterval(tick, 15_000)
+  bot.api.setMyCommands([]).catch(() => {})
+  bot.catch((err) => console.error('ошибка бота:', err.message))
 
-const me = await bot.api.getMe()
-console.log(`«Семь ночей» запущен: @${me.username}, практик ${practices.length}, демо-режим ${DEMO_DEFAULT ? 'включён' : 'выключен'}`)
-bot.start({ drop_pending_updates: true })
+  const me = await bot.api.getMe()
+  console.log(`«Семь ночей» запущен: @${me.username}, практик ${practices.length}, демо-режим ${DEMO_DEFAULT ? 'включён' : 'выключен'}`)
+  bot.start({ drop_pending_updates: true })
 
-const stop = () => { bot.stop(); db.close(); process.exit(0) }
-process.once('SIGINT', stop)
-process.once('SIGTERM', stop)
+  const stop = () => { bot.stop(); db.close(); process.exit(0) }
+  process.once('SIGINT', stop)
+  process.once('SIGTERM', stop)
+}
