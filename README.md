@@ -125,6 +125,8 @@ npm run build:admin   # сборка админки
 | `docs/quiz-bot-integration.md` | Как тест соединён с ботом |
 | `docs/content-plan.md` | Исследование аудиопрактик и план библиотеки |
 | `docs/tts-decision.md` | Почему Azure, а не ElevenLabs; замеры голосов |
+| `docs/before-launch.md` | Что заполнить перед запуском (собирается скриптом) |
+| `docs/critic-report.md` | Разбор расхождений между документами |
 
 ---
 
