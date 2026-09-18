@@ -58,5 +58,65 @@
     "hash": "bfbb976974781edf",
     "chars": 2641,
     "generatedAt": "2026-09-18T08:02:06.054Z"
+  },
+  "day-tune": {
+    "slug": "day-tune",
+    "title": "Настроить день",
+    "category": "day",
+    "intro": [
+      "Утренняя. Пять минут до того, как откроешь всё остальное.",
+      "Сидя, глаза можно закрыть."
+    ],
+    "duration": 574,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "496411fe62dd44b2",
+    "chars": 3012,
+    "generatedAt": "2026-09-18T08:02:44.889Z"
+  },
+  "sleep-landing": {
+    "slug": "sleep-landing",
+    "title": "Приземление",
+    "category": "sleep",
+    "intro": [
+      "Сегодня — самая простая. Ложись, наушники, свет можно выключить.",
+      "Если уснёшь до конца — так и надо."
+    ],
+    "duration": 589,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "87364671f1590de9",
+    "chars": 2700,
+    "generatedAt": "2026-09-18T08:03:29.662Z"
+  },
+  "sleep-release": {
+    "slug": "sleep-release",
+    "title": "Отпустить день",
+    "category": "sleep",
+    "intro": [
+      "Сегодня — сначала немного напрячься, чтобы по-настоящему отпустить.",
+      "Если что-то болит — эту часть пропускай."
+    ],
+    "duration": 589,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "369efd3bf264629f",
+    "chars": 3072,
+    "generatedAt": "2026-09-18T08:04:14.430Z"
+  },
+  "sleep-shuffle": {
+    "slug": "sleep-shuffle",
+    "title": "Случайные картинки",
+    "category": "sleep",
+    "intro": [
+      "Сегодня для головы, которая не выключается.",
+      "Я буду называть картинки, тебе — только представлять. Смысла в них нет, так и задумано."
+    ],
+    "duration": 594,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "3c7e790103936019",
+    "chars": 2203,
+    "generatedAt": "2026-09-18T08:05:02.594Z"
   }
 }

@@ -1238,3 +1238,343 @@ SELECT COUNT(*) FROM events WHERE type='autopaused';
 3. **Практики** — список с категорией, порядком, плеером, длительностью, числом прослушиваний; формы редактирования двух строк; загрузка mp3 (drag-n-drop); переключатель «активна»; предупреждение «у практики нет аудио».
 4. **Тексты** — по разделам, поле, список допустимых плейсхолдеров, кнопка «вернуть как было», отметка «изменено».
 5. **Настройки** — ссылки, id администраторов, маршрут сна, `allow_restart`, секрет демо, кнопки «Скачать CSV».
+
+---
+
+## 7. Картинка графика для бота
+
+Цель — артефакт, который не стыдно переслать и положить в сторис: вертикаль 4:5, тёмный тёплый фон, две линии, крупный итог, ноль личных данных.
+
+### 7.1 Геометрия (фиксирована)
+
+| Параметр | Значение |
+|---|---|
+| Холст | **1200 × 1500** (4:5), PNG |
+| Фон | `#14110F`, поверх — радиальный градиент «лампы» из `#2A2119` (30 % прозрачности) с центром `(600, 300)` |
+| Заголовок «Семь ночей» | Noto Sans Bold 64, `#F3EAE0`, центр, baseline `y = 150` |
+| Подзаголовок (даты) | Regular 32, `#8C8078`, центр, `y = 200`, формат «18 сентября — 24 сентября» |
+| Поле графика | `x ∈ [150, 1050]`, `y ∈ [330, 1010]` (ширина 900, высота 680) |
+| Сетка | 6 горизонталей (`v = 0,2,4,6,8,10`), `#2B2521`, толщина 1; подписи слева Regular 26 `#6E645C` |
+| Ось X | подписи «1»…«7» Regular 30 `#8C8078`, `y = 1060` |
+| Линия «до» | `#7C6A58`, толщина 6, точки r = 9, заливка `#14110F`, обводка цветом линии |
+| Линия «после» | `#E9B368`, толщина 8, точки r = 11, заливка сплошная; сверху лёгкое свечение (та же линия, толщина 18, `opacity 0.12`) |
+| Легенда | две подписи Regular 28 у правого края под заголовком: «до» `#7C6A58`, «после» `#E9B368` |
+| Итог | Bold 92 `#F3EAE0`, центр, `y = 1250`: «Было {first} → стало {last}» |
+| Подпись | Regular 28 `#6E645C`, центр, `y = 1420`: «@ensoma_robot» |
+
+Координаты:
+```
+x(evening) = 150 + (evening - 1) * 150            // 7 точек, шаг 150
+y(value)   = 1010 - (value / 10) * 680            // 0 внизу, 10 наверху
+```
+
+### 7.2 Правила отрисовки данных
+
+- `null` — **разрыв**, а не ноль. Путь строится сегментами: подряд идущие непустые точки соединяются, на `null` линия прерывается. Одиночная непустая точка между двумя `null` рисуется только кружком.
+- На месте `null` рисуется пустой кружок r = 7 с обводкой `#3A322C` — «этот вечер был, замера нет».
+- Если человек прошёл меньше 7 вечеров (график запрашивают из админки), пустые вечера — пустые кружки, ось всё равно 1…7.
+- Никаких имён, дат рождения, `tg_id`, номеров участника. Только даты первого и последнего вечера.
+- Все числа — целые 0…10, шрифт только из `assets/fonts` (в resvg системные шрифты выключены, иначе на другой машине картинка «поедет»).
+
+### 7.3 Реализация
+
+```ts
+// src/chart/svg.ts — чистая функция, тестируется сравнением подстрок, без рендера
+export function buildChartSvg(points: ChartPoint[], o: ChartOpts): string {
+  const X = (e: number) => 150 + (e - 1) * 150
+  const Y = (v: number) => 1010 - (v / 10) * 680
+  const segments = (key: 'before' | 'after') => {
+    const out: string[] = []; let cur: string[] = []
+    for (const p of points) {
+      const v = p[key]
+      if (v == null) { if (cur.length > 1) out.push(cur.join(' ')); cur = []; continue }
+      cur.push(`${cur.length ? 'L' : 'M'}${X(p.evening)},${Y(v)}`)
+    }
+    if (cur.length > 1) out.push(cur.join(' '))
+    return out
+  }
+  // …собираем строку SVG: <svg width="1200" height="1500" viewBox="0 0 1200 1500"
+  //    xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans"> … </svg>
+}
+
+// src/chart/render.ts
+import { Resvg } from '@resvg/resvg-js'
+export function renderPng(svg: string): Buffer {
+  const r = new Resvg(svg, {
+    background: '#14110F',
+    fitTo: { mode: 'width', value: 1200 },
+    font: {
+      loadSystemFonts: false,
+      fontFiles: ['assets/fonts/NotoSans-Regular.ttf', 'assets/fonts/NotoSans-Bold.ttf'],
+      defaultFontFamily: 'Noto Sans',
+    },
+  })
+  return Buffer.from(r.render().asPng())
+}
+```
+Текст в SVG экранируется (`&`, `<`, `>`), хотя подставляются только числа и даты. Рендер занимает ~60–120 мс — синхронный вызов допустим, он случается один раз на человека за неделю.
+
+Та же функция используется админкой: `GET /api/admin/users/:id/chart.png` — специалист видит ровно то, что получил человек.
+
+---
+
+## 8. Аудио-пайплайн
+
+> **Провайдер — Azure AI Speech**, не ElevenLabs (см. §0, решение 3 и `docs/tts-decision.md`). Ключ: `~/.claude/secrets/azure-speech.env` (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION=westeurope`, тариф F0 ≈ 500 000 знаков/мес). Квота избыточна, поэтому перегенерация ничего не стоит и «права на ошибку нет» больше не действует.
+
+### 8.1 Источник — сценарии
+
+`content/practices/<slug>.md`, 9 штук, уже написаны. Frontmatter: `slug`, `title`, `category`, `duration_hint`, `intro` (две строки → `line1`/`line2` в БД), `chars`. Тело — текст с паузами двух видов: `<break time="2.0s" />` и `[[pause:8]]`. Слаги: `sleep-landing`, `sleep-warmth`, `sleep-release`, `sleep-shuffle`, `calm-sigh`, `calm-ground`, `calm-kind`, `day-tune`, `day-talk`.
+
+### 8.2 Генерация (`scripts/generate-audio.ts` — уже написан, не переписывать)
+
+```
+npm run audio:generate                    # всё, чего нет или что изменилось
+npm run audio:generate -- --only sleep-landing
+npm run audio:generate -- --force         # перегенерировать всё
+npm run audio:generate -- --dry-run       # посчитать знаки и куски, ничего не тратить
+npm run audio:generate -- --voice ru-RU-SvetlanaNeural --style ""
+```
+Конвейер: `parseScript` (оба синтаксиса пауз, схлопывание подряд идущих, обрезка пауз по краям) → `planRequests` (куски между паузами; для голосов без поддержки `<break>` паузы делаются склейкой, а не SSML) → `synthesize` (REST `POST /cognitiveservices/v1`, `audio-48khz-192kbitrate-mono-mp3`, `prosody rate` по профилю категории) → ffmpeg: `anullsrc` нужной длины между кусками, `concat`, `adelay=1500`, `lowpass=f=12000`, `loudnorm` (−19 LUFS сон / −17 остальные), `afade` в конце (8 с для сна), хвост тишины (5 с сон / 2 с) → `content/audio/<slug>.mp3`.
+
+### 8.3 Идемпотентность
+
+`content/audio/manifest.json`:
+```json
+{ "sleep-landing": { "duration": 312.4, "voice": "ru-RU-Masha:MAI-Voice-2",
+                     "style": "caringempathy", "hash": "<sha256 тела сценария + параметров>",
+                     "bytes": 7512345, "generated_at": 1758100000 } }
+```
+Совпал хеш — файл не трогаем и **не тратим квоту**. `--force` игнорирует манифест. Манифест — источник `duration_sec` для БД при синке (`syncPracticesFromFiles`).
+
+### 8.4 Загрузка в Telegram и кэш `file_id`
+
+- При первой отправке практики `sendAudio` получает `InputFile` из `content/audio/<slug>.mp3`; из ответа берём `audio.file_id` и `file_unique_id` → `practices.tg_file_id`. Дальше всем остальным шлём строку `file_id` — файл больше не загружается.
+- `scripts/upload-audio.ts` прогревает кэш заранее (чтобы первый живой человек не ждал загрузки 7 МБ): шлёт все практики с `tg_file_id IS NULL` в чат первого `ADMIN_TG_IDS` и сохраняет `file_id`. Запускать после каждой генерации: `npm run audio:upload`.
+- Протухание (`wrong file identifier`, смена токена бота, удаление файла в Telegram) — `Sender.audio` ловит эту ошибку, вызывает `clearFileId` и перезаливает с диска один раз (§5.5).
+- Загрузка через админку (`POST /practices/:id/audio`) обязана вызвать `clearFileId` — иначе люди получат старую запись.
+- Ограничения Telegram: 50 МБ на bot API; наши файлы ~5–8 МБ. `duration` и `title`/`performer` передаём всегда — без них плеер в чате выглядит как безымянный файл, а это прямо противоречит вау-моменту №3.
+
+### 8.5 Порядок работ по контенту
+
+1. `npm run audio:samples` → владелец слушает голоса → выбирает → `TTS_VOICE`/`TTS_STYLE` в `.env`.
+2. `npm run audio:generate` → 9 mp3 + манифест.
+3. `npm run seed` → практики в БД с `line1`/`line2` и длительностями.
+4. `npm run audio:upload` → прогрев `file_id`.
+5. Специалист позже заменяет файлы своим голосом **через админку**, по одной практике; слаги, тексты и маршрут не меняются.
+
+### 8.6 Интерфейс провайдера (на случай ElevenLabs)
+
+```ts
+export type TtsProvider = {
+  name: 'azure' | 'elevenlabs'
+  quota(): Promise<{ used: number; limit: number }>
+  synthesize(parts: SsmlPart[] | string, v: VoiceParams): Promise<Buffer>
+  honorsBreaks(voice: string): boolean
+}
+```
+`scripts/tts.ts` уже реализует `azure`. Добавление ElevenLabs = новый файл с тем же интерфейсом + выбор по `TTS_PROVIDER`; ротация ключей (`KEY_2..6`) имеет смысл только там и только на платном плане.
+
+---
+
+## 9. Стратегия тестирования
+
+`vitest`, все тесты — офлайн, ни одного сетевого вызова. `npm test` — обязательная часть приёмки.
+
+### 9.1 Опоры
+
+```ts
+// tests/helpers/db.ts
+export function testDb(): Database            // new Database(':memory:'), миграции, seed текстов и практик
+
+// tests/helpers/clock.ts
+export const clk = fakeClock(1758000000)      // sleep() резолвится мгновенно
+
+// tests/helpers/bot.ts
+export function testBot(ctx: Ctx) {
+  const outbox: Array<{ method: string; payload: any }> = []
+  const bot = new Bot('12345:TEST', { botInfo: { id: 1, is_bot: true, first_name: 'Семь ночей',
+                                                 username: 'ensoma_robot', can_join_groups: false,
+                                                 can_read_all_group_messages: false,
+                                                 supports_inline_queries: false } })
+  // перехват ВСЕХ исходящих вызовов: сеть не трогаем, возвращаем правдоподобные ответы
+  bot.api.config.use(async (prev, method, payload) => {
+    outbox.push({ method, payload })
+    if (method === 'sendMessage' || method === 'sendPhoto')
+      return { ok: true, result: { message_id: nextMsgId(), date: clk.now(), chat: { id: payload.chat_id } } } as any
+    if (method === 'sendAudio')
+      return { ok: true, result: { message_id: nextMsgId(), audio: { file_id: 'FILE_1',
+               file_unique_id: 'U1', duration: 300 } } } as any
+    return { ok: true, result: true } as any
+  })
+  return { bot, outbox, texts: () => outbox.filter(o => o.method === 'sendMessage').map(o => o.payload.text) }
+}
+export function msg(text: string, from = 1000): Update       // фейковый Update с message
+export function cb(data: string, from = 1000): Update        // фейковый Update с callback_query
+```
+`botInfo` передаётся явно, поэтому `bot.init()` не ходит в `getMe`. Обновления скармливаются напрямую: `await bot.handleUpdate(msg('21:00'))`.
+
+### 9.2 Обязательные тесты (каждый = пункт приёмки или инвариант)
+
+| Файл | Проверяет |
+|---|---|
+| `parse.test.ts` | все формы часа, часов, цифры, payload `?start=q42`, слова паузы, склонение «деление/деления/делений» |
+| `onboarding.test.ts` | **5 касаний до звучащей практики**: `/start` → «21:00» → «18:42» → «4» → «😴 Сон» → в outbox есть `sendAudio`. Отдельно: индекс с лендинга упомянут ровно один раз; без payload строки нет |
+| `evening.test.ts` | полный вечер: цифры записаны, `current_evening` вырос в момент `sendAudio`, `ev.close` содержит «Было 4, стало 7», `{dots}` = `●○○○○○○` |
+| `skip.test.ts` | **пропуск сдвигает программу**: пинг вечера 3 → тишина → 04:00 → `evening_skipped`, `current_evening` не изменился → следующий пинг снова «Вечер 3 из 7» и начинается с `ev.before_after_skip`; три пропуска → автопауза и ни одного четвёртого пинга |
+| `finale.test.ts` | **седьмой вечер даёт график**: в outbox есть `sendPhoto` c непустым буфером, подпись содержит «Было 4. Стало 7», следом `final.invite`, `state='completed'`, событие `finished`, уведомление в очереди |
+| `now.test.ts` | правило слияния: «Практика сейчас» в вечернем окне запускает вечер (`kind='evening'`, плановый пинг не дублируется), днём — `kind='now'` и `current_evening` не меняется; возврат в прежнее состояние по таймауту |
+| `pause.test.ts` | пауза словом и кнопкой из каждого состояния, «Продолжить» в окне и вне окна, `consecutive_skips` не растёт на паузе |
+| `scheduler.test.ts` | фейковые часы: `due_at` в прошлом → ровно одно действие; **двойной тик не шлёт дважды** (claim); перезапуск (пересоздание Ctx на той же БД) не теряет и не дублирует; просрочка `practicing` ≥ 3 ч не задаёт ночной вопрос; `due_kind` ≠ состояние → самолечение без отправки |
+| `demo-run.test.ts` | **приёмочный прогон целиком**: демо-пользователь проходит 7 вечеров на фейковых часах за ≤ 20 «минут», получает график, день 8 приходит один раз, дальше молчание |
+| `pick.test.ts` | маршрут сна 1→A…7→A; при выключенной практике падаем на «меньше всего слушал»; пустая категория → sleep; пустая библиотека → `err.no_practices` и сессия не зависает |
+| `chart.test.ts` | `buildChartSvg` даёт разрыв на `null` (два `path`, а не один), 7 подписей оси, итог в тексте; `renderPng` возвращает PNG с сигнатурой `\x89PNG` и размером 1200×1500 |
+| `quiz.test.ts` ✅ | границы результатов по сумме (0–21 / 22–35 / 36–49 / 50–59 / 60–70), индекс = round(sum/70*100) |
+| `quiz-bot.test.ts` | предложение после финала только при наличии входного индекса; «Не сейчас» больше не спрашивает; 7 ответов дают «Было 60. Стало 74.» + дисклеймер; «Назад» удаляет ответ |
+| `stats.test.ts` | на подготовленной БД (10 людей, разные исходы) каждая формула §6.6 даёт ожидаемое число; демо-пользователи исключены |
+| `admin-api.test.ts` | 401 без куки; логин, CRUD практик, валидация плейсхолдеров при `PUT /texts/:key`, multipart-загрузка сбрасывает `tg_file_id`, CSV начинается с BOM |
+| `tts.test.ts` ✅ | парсер сценариев и планировщик запросов |
+
+### 9.3 Приёмка из ТЗ → тест
+
+| Пункт ТЗ | Автотест | Ручная проверка |
+|---|---|---|
+| Прогон 7 вечеров в ускоренном режиме | `demo-run.test.ts` | `/demo <secret>` в живом боте, ~15 минут |
+| Пропуск вечера сдвигает программу | `skip.test.ts` | демо: пропустить один вечер |
+| На 7-м вечере график и итог | `finale.test.ts` + `chart.test.ts` | картинку посмотреть глазами на телефоне |
+| Уведомления и цифры видны | `stats.test.ts` | дашборд админки + сообщения владельцу |
+
+---
+
+## 10. Конфигурация и деплой
+
+### 10.1 `.env` (полный список; `.env.example` привести к нему)
+
+```dotenv
+TELEGRAM_BOT_TOKEN=            # из ~/.claude/secrets/seven-nights.env, НИКОГДА не в git
+ADMIN_PASSWORD=change-me       # пароль админки, минимум 12 символов
+PORT=3700
+BIND_HOST=100.91.124.2         # только tailnet, наружу не слушаем
+ADMIN_TG_IDS=                  # id владельца и специалиста через запятую (узнать: /whoami в боте)
+DATA_DIR=./data
+CONTENT_DIR=./content
+BOT_USERNAME=ensoma_robot
+SCHEDULER_TICK_MS=30000
+DEMO_MODE_DEFAULT=0
+ADMIN_COOKIE_SECURE=0          # 1 только когда появится https-домен
+LOG_LEVEL=info
+TZ=UTC                         # обязательно: все расчёты идут от tz_offset_min пользователя
+# озвучка (используются только скриптами, не сервисом)
+AZURE_SPEECH_KEY=
+AZURE_SPEECH_REGION=westeurope
+TTS_VOICE=ru-RU-Masha:MAI-Voice-2
+TTS_STYLE=caringempathy
+FFMPEG_BIN=/home/karpushin/.local/bin/ffmpeg
+FFPROBE_BIN=/home/karpushin/.local/bin/ffprobe
+```
+
+### 10.2 npm-скрипты
+
+```jsonc
+{
+  "dev":            "tsx watch src/index.ts",
+  "start":          "tsx src/index.ts",
+  "typecheck":      "tsc --noEmit",
+  "test":           "vitest run",
+  "seed":           "tsx scripts/seed.ts",            // миграции + тексты + практики из файлов
+  "backup":         "tsx scripts/backup-db.ts",
+  "build:admin":    "vite build --config web/admin/vite.config.ts",   // → web/admin/dist
+  "dev:admin":      "vite --config web/admin/vite.config.ts",         // proxy /api → 3700
+  "audio:samples":  "tsx scripts/voice-samples.ts",
+  "audio:generate": "tsx scripts/generate-audio.ts",
+  "audio:upload":   "tsx scripts/upload-audio.ts"
+}
+```
+`web/admin/vite.config.ts`: `base: '/admin/'`, `build.outDir: 'dist'`, `server.proxy['/api'] = 'http://127.0.0.1:3700'`.
+
+### 10.3 HTTP-сервер (`src/http/server.ts`)
+
+| Маршрут | Что отдаёт |
+|---|---|
+| `GET /` и `/*` (статика) | `web/landing/` — лендинг с тестом |
+| `GET /admin`, `/admin/*` | `web/admin/dist/` со SPA-фолбэком на `index.html` |
+| `/api/admin/*` | §6 |
+| `GET /media/practices/:file` | аудио для плеера админки (требует куки) |
+| `GET /healthz` | `{ ok, uptimeSec, users, dueBacklog, lastTickAt, botUsername }` — без авторизации, для монитора |
+
+Слушаем `BIND_HOST:PORT` (`100.91.124.2:3700`) — снаружи tailnet порт недоступен. Публичный домен добавится Caddy-прокси позже, тогда же `ADMIN_COOKIE_SECURE=1`.
+
+### 10.4 systemd (`deploy/seven-nights.service`, уже написан)
+
+Ключевое — по образцу `mapper.service` и с учётом инцидента 2026-08-04:
+- `Restart=always` (не `on-failure`: systemd считает смерть от SIGTERM штатной, и `on-failure` такой процесс не поднимет),
+- `RestartSec=2`,
+- `EnvironmentFile=/home/karpushin/7days/.env`,
+- `Environment=PROCESS_TITLE=seven-nights` — процесс называет себя сам (`process.title`), чтобы его можно было найти и остановить **точно**,
+- `KillMode=mixed`, `TimeoutStopSec=20` — один владелец long polling; два экземпляра дают `409 Conflict`.
+
+Установка и эксплуатация:
+```bash
+cp /home/karpushin/7days/deploy/seven-nights.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now seven-nights
+systemctl --user status seven-nights
+journalctl --user -u seven-nights -f
+systemctl --user restart seven-nights     # только так; никаких pkill по имени файла
+```
+**Никогда не останавливать сервис сигналом по шаблону имени** (`pkill -f index.ts` найдёт половину машины) — только `systemctl --user stop seven-nights`.
+
+### 10.5 Порядок первого запуска
+
+```bash
+cd /home/karpushin/7days
+npm ci
+cp .env.example .env && $EDITOR .env          # токен, пароль, ADMIN_TG_IDS
+npm run seed                                  # схема + тексты по умолчанию + практики
+npm run audio:generate                        # 9 mp3 (нужен AZURE_SPEECH_KEY)
+npm run build:admin
+systemctl --user enable --now seven-nights
+npm run audio:upload                          # прогрев file_id (бот уже должен работать)
+```
+
+### 10.6 Логи и наблюдаемость
+
+- Один JSON-объект на строку в stdout → journald. Обязательные поля: `ts`, `level`, `msg`, `user_id`, `state_from`, `state_to`, `trigger`, `session_id`, `ms`. Токен и текст свободных сообщений в лог **не пишем** (в логе только длина).
+- Каждый переход состояния логируется на `info` — по журналу можно восстановить путь любого человека, не открывая БД.
+- `GET /healthz` отдаёт `dueBacklog` = число пользователей с `due_at <= now`; устойчивое значение > 20 означает, что тик не справляется или падает.
+
+---
+
+## 11. Зависимости модулей и риски
+
+### 11.1 Граф импортов (стрелка = «импортирует»)
+
+```
+src/index.ts → env, db/index, content/practices, texts, bot/index, scheduler/index, http/server
+bot/index    → ctx, flow, parse, texts, keyboards, send, admin-cmds
+bot/flow     → db/{users,sessions,events,plays,messages,quiz}, time, timings, texts, keyboards,
+               send, content/{pick,audio}, chart/{data,svg,render}, bot/notify
+scheduler/*  → db/users, time, timings, bot/flow (только публичные функции §5.6), bot/notify, send
+admin-api/*  → db/*, texts, content/practices, chart/*, send (для «Написать» и preview)
+chart/*      → db/sessions (только через chart/data), resvg
+content/*    → db/{practices,plays,settings}, send
+send         → db/{users,practices}, texts, bot/flow (ТОЛЬКО обработчик 403 — вынесен в
+               отдельный модуль bot/blocked.ts, чтобы не было цикла send ↔ flow)
+```
+Циклов быть не должно; единственное опасное место (`send` ↔ `flow`) разорвано вынесением `markBlocked()` в `src/bot/blocked.ts`, который зависит только от `db/users` и `db/events`.
+
+### 11.2 Пять самых рискованных мест
+
+1. **Двойная отправка практики** (дабл-тап, ретрай, перезапуск) — четыре рубежа §4.4; тест «двойной тик» и «дабл-тап по категории» обязательны.
+2. **Транзакция и `await`** — `better-sqlite3` синхронен; `await` внутри `db.transaction()` рвёт атомарность молча. Три такта §2.5.1 — единственный разрешённый паттерн.
+3. **Часовой пояс и ритуальная дата** — весь движок держится на `tz_offset_min` и границе 04:00; любая работа с `new Date()` в локальном поясе сервера ломает всё незаметно. `TZ=UTC` + `time.ts` — единственная арифметика дат.
+4. **Кэш `file_id` и подмена аудио через админку** — забыть `clearFileId` = люди неделю слушают старую запись; ошибка не видна ни в логах, ни в тестах.
+5. **Таймеры после простоя** — расчёт «что делать с просроченным `due_at`» (строки 9, 21, 27) отвечает за то, что человек не получит в 11 утра «А сейчас как, от 0 до 10?» про вчерашнюю практику.
+
+### 11.3 Открытые вопросы (решать после первых прогонов, в код не закладывать)
+
+- Порог автопаузы 3 vs 4 (`settings.autopause_after_skips` уже вынесен в настройки).
+- Фиксированные 10:00 для утреннего догона при вечернем часе 23:00 — возможно `max(10:00, {time} − 11 ч)`.
+- Нужен ли «мягкий напоминатель» через 90 минут после проигнорированного пинга (в v1 сознательно нет).
+- Летнее время: автоматики нет, лечится кнопкой «Поменять время».
+- Вход свободный (оплата и коды выпилены) — защиты от посторонних нет. IP мы не видим, поэтому единственная мера при потоке спама — ручная блокировка в админке (`DELETE /api/admin/users/:id`) плюс, если понадобится, флаг «приём новых закрыт» в настройках: `/start` отвечает одним текстом и пользователя не создаёт.
