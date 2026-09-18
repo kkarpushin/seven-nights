@@ -17,7 +17,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { billableChars, parseScript, PROFILES, profileFor, synthesize, type Segment, type VoiceParams } from './tts.ts'
+import { pathToFileURL } from 'node:url'
+import { honorsSsmlBreaks, leftoverMarkup, parseScript, planRequests, PROFILES, profileFor, synthesize, type VoiceParams } from './tts.ts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const SCRIPTS_DIR = join(ROOT, 'content', 'practices')
@@ -131,19 +132,22 @@ function postprocess(joinedWav: string, outMp3: string, profile: (typeof PROFILE
   ])
 }
 
-async function renderPractice(p: Practice, v: VoiceParams, segments: Segment[], outMp3: string) {
+type Plan = ReturnType<typeof planRequests>
+
+async function renderPractice(p: Practice, v: VoiceParams, plan: Plan, outMp3: string) {
   const work = mkdtempSync(join(tmpdir(), `sn-${p.slug}-`))
   try {
     const parts: string[] = []
-    let textIndex = 0
-    for (const [i, seg] of segments.entries()) {
+    let spoken = 0
+    const total = plan.filter((r) => r.kind === 'speak').length
+    for (const [i, req] of plan.entries()) {
       const path = join(work, `${String(i).padStart(3, '0')}.wav`)
-      if (seg.kind === 'pause') {
-        silenceWav(path, seg.seconds)
+      if (req.kind === 'silence') {
+        silenceWav(path, req.seconds)
       } else {
-        textIndex++
-        process.stdout.write(`   кусок ${textIndex} (${seg.text.length} зн.)\r`)
-        writeFileSync(path, await synthesize(seg.text, v))
+        spoken++
+        process.stdout.write(`   кусок ${spoken}/${total} (${req.chars} зн.)   \r`)
+        writeFileSync(path, await synthesize(req.parts, v))
       }
       parts.push(path)
     }
@@ -181,23 +185,33 @@ async function main() {
 
     const prof = profileFor(p.slug, p.category)
     const voice: VoiceParams = { voice: args.voice, style: args.style || undefined, rate: PROFILES[prof].rate }
+    leftoverMarkup.length = 0
     const segments = parseScript(p.body)
-    const chars = billableChars(segments)
-    const chunks = segments.filter((s) => s.kind === 'text').length
+    if (leftoverMarkup.length) {
+      // Разметка, которую не понял парсер, вырезана — но сценарий надо починить,
+      // иначе задуманной паузы в практике не будет.
+      console.warn(`   ⚠ вырезана нераспознанная разметка: ${[...new Set(leftoverMarkup)].join(' ')}`)
+    }
+    const plan = planRequests(segments, voice.voice)
+    const chars = plan.reduce((n, r) => (r.kind === 'speak' ? n + r.chars : n), 0)
+    const chunks = plan.filter((r) => r.kind === 'speak').length
     const pauseSec = segments.reduce((n, s) => (s.kind === 'pause' ? n + s.seconds : n), 0)
     totalChars += chars
 
-    const hash = createHash('sha256').update(JSON.stringify({ body: p.body, voice })).digest('hex').slice(0, 16)
+    const hash = createHash('sha256')
+      .update(JSON.stringify({ body: p.body, voice, inlineBreaks: honorsSsmlBreaks(voice.voice) }))
+      .digest('hex')
+      .slice(0, 16)
     const outMp3 = join(AUDIO_DIR, `${p.slug}.mp3`)
     const fresh = manifest[p.slug]?.hash === hash && existsSync(outMp3)
 
     console.log(
-      `${p.slug.padEnd(16)} ${String(chars).padStart(5)} зн. · ${String(chunks).padStart(3)} кусков · пауз ${Math.round(pauseSec)}с · профиль ${prof}` +
+      `${p.slug.padEnd(16)} ${String(chars).padStart(5)} зн. · ${String(chunks).padStart(3)} запросов · пауз ${Math.round(pauseSec)}с · профиль ${prof}` +
         (fresh && !args.force ? ' · уже готово' : ''),
     )
     if (args.dryRun || (fresh && !args.force)) continue
 
-    await renderPractice(p, voice, segments, outMp3)
+    await renderPractice(p, voice, plan, outMp3)
     const duration = ffprobeDuration(outMp3)
     manifest[p.slug] = {
       slug: p.slug, title: p.title, category: p.category, intro: p.intro,
@@ -213,7 +227,11 @@ async function main() {
   if (!args.dryRun) console.log(`Манифест: ${MANIFEST}`)
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e)
-  process.exit(1)
-})
+// Файл одновременно и CLI, и модуль (readPractice импортирует voice-samples.ts),
+// поэтому main() запускается только когда файл вызван напрямую.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e)
+    process.exit(1)
+  })
+}

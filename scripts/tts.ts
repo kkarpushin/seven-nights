@@ -5,10 +5,11 @@
  * тариф F0 ≈ 500 000 знаков в месяц). Почему не ElevenLabs — см. docs/tts-decision.md:
  * бесплатные аккаунты не могут синтезировать библиотечными голосами через API.
  *
- * Паузы делаются НЕ тегами SSML, а склейкой: сценарий режется на куски, каждый
- * кусок синтезируется отдельно, между ними ffmpeg вставляет цифровую тишину точной
- * длины. Так паузы не зависят от того, уважает ли конкретный голос <break/>
- * (генеративный ru-RU-Masha:MAI-Voice-2 его игнорирует), и не упираются в потолок 5 с.
+ * Паузы: короткие (< 2,5 с) остаются тегом <break/> внутри запроса — но только у
+ * голосов, которые теги уважают. Длинные, а у генеративного MAI-Voice-2 вообще все,
+ * делаются СКЛЕЙКОЙ: сценарий режется на куски, каждый синтезируется отдельно, между
+ * ними ffmpeg вставляет цифровую тишину точной длины. Так паузы не зависят от голоса
+ * и не упираются в потолок 5 с, а интонация фразы не рвётся там, где резать не нужно.
  */
 
 import { readFileSync } from 'node:fs'
@@ -53,7 +54,9 @@ export function profileFor(slug: string, category = ''): keyof typeof PROFILES {
  * абзацы в сплошной поток, а медитация так не читается.
  */
 export function parseScript(body: string, paragraphPauseSec = 0.8): Segment[] {
-  const PAUSE_RE = /\[\[pause:\s*([\d.]+)\s*\]\]|<break\s+time=["']?([\d.]+)(ms|s)["']?\s*\/?>/gi
+  // Единица необязательна у обоих синтаксисов: [[pause:8]], [[pause:600ms]],
+  // <break time="2.0s"/>, <break time="2000ms"/>. Без единицы считаем секунды.
+  const PAUSE_RE = /\[\[\s*pause:\s*([\d.]+)\s*(ms|s)?\s*\]\]|<break\s+time=["']?([\d.]+)\s*(ms|s)?["']?\s*\/?>/gi
   const segments: Segment[] = []
   let cursor = 0
 
@@ -68,7 +71,8 @@ export function parseScript(body: string, paragraphPauseSec = 0.8): Segment[] {
 
   for (let m = PAUSE_RE.exec(body); m; m = PAUSE_RE.exec(body)) {
     pushText(body.slice(cursor, m.index))
-    const seconds = m[1] !== undefined ? Number(m[1]) : m[3]?.toLowerCase() === 'ms' ? Number(m[2]) / 1000 : Number(m[2])
+    const [value, unit] = m[1] !== undefined ? [m[1], m[2]] : [m[3], m[4]]
+    const seconds = unit?.toLowerCase() === 'ms' ? Number(value) / 1000 : Number(value)
     if (Number.isFinite(seconds) && seconds > 0) segments.push({ kind: 'pause', seconds })
     cursor = m.index + m[0].length
   }
@@ -90,9 +94,24 @@ export function parseScript(body: string, paragraphPauseSec = 0.8): Segment[] {
   return merged
 }
 
-/** Приводит кусок к одной строке: синтезу не нужны переносы, а лишние пробелы он читает как заминки. */
+/**
+ * Приводит кусок к одной строке: синтезу не нужны переносы, а лишние пробелы он
+ * читает как заминки.
+ *
+ * Здесь же страховка: любая разметка, которую не разобрал парсер пауз, вырезается
+ * и попадает в `leftoverMarkup`. Без неё опечатка вроде `[[pause:600мс]]` была бы
+ * ПРОЧИТАНА ВСЛУХ посреди практики — ровно так и нашлось на первом же сценарии.
+ */
+const MARKUP_RE = /\[\[[^\]]*\]\]|<[^>]+>/g
+
+export const leftoverMarkup: string[] = []
+
 function normalize(s: string): string {
-  return s
+  const cleaned = s.replace(MARKUP_RE, (found) => {
+    leftoverMarkup.push(found)
+    return ' '
+  })
+  return cleaned
     .replace(/\r/g, '')
     .replace(/[ \t]*\n[ \t]*/g, ' ')
     .replace(/\s{2,}/g, ' ')
@@ -108,14 +127,84 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-export function buildSsml(text: string, v: VoiceParams): string {
-  const inner = `<prosody rate="${v.rate}">${escapeXml(text)}</prosody>`
+/**
+ * Уважает ли голос теги `<break/>` и `prosody rate`.
+ *
+ * Замерено 2026-09-18 (docs/tts-decision.md): классические Neural-голоса держат
+ * паузы с точностью до долей секунды, а генеративный MAI-Voice-2 их игнорирует
+ * вместе с замедлением — там паузы приходится делать только склейкой.
+ */
+export function honorsSsmlBreaks(voice: string): boolean {
+  return !voice.includes('MAI-Voice-2')
+}
+
+/**
+ * Кусок для одного запроса синтеза: текст вперемешку с короткими паузами.
+ * Длинные паузы сюда не попадают — они становятся границей между кусками.
+ */
+export type SsmlPart = { text: string } | { breakSec: number }
+
+export function buildSsml(parts: SsmlPart[] | string, v: VoiceParams): string {
+  const list: SsmlPart[] = typeof parts === 'string' ? [{ text: parts }] : parts
+  const body = list
+    .map((p) =>
+      'text' in p
+        ? escapeXml(p.text)
+        : // Azure принимает максимум 5 секунд на тег; больше — только склейкой.
+          `<break time="${Math.round(Math.min(p.breakSec, 5) * 1000)}ms"/>`,
+    )
+    .join('')
+  const inner = `<prosody rate="${v.rate}">${body}</prosody>`
   const styled = v.style ? `<mstts:express-as style="${v.style}">${inner}</mstts:express-as>` : inner
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" ` +
     `xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="ru-RU">` +
     `<voice name="${v.voice}">${styled}</voice></speak>`
   )
+}
+
+/**
+ * Группирует сегменты в запросы синтеза.
+ *
+ * Голос, уважающий SSML: короткие паузы (< порога) остаются внутри куска тегом
+ * `<break/>` — так интонация фразы не рвётся, а число запросов падает с полусотни
+ * до единиц. Длинные паузы всё равно режут, потому что тег ограничен пятью секундами.
+ *
+ * Голос, игнорирующий SSML: режем по каждой паузе — иначе их не будет вовсе.
+ */
+export function planRequests(
+  segments: Segment[],
+  voice: string,
+  inlineThresholdSec = 2.5,
+): Array<{ kind: 'speak'; parts: SsmlPart[]; chars: number } | { kind: 'silence'; seconds: number }> {
+  const inlineOk = honorsSsmlBreaks(voice)
+  const out: Array<{ kind: 'speak'; parts: SsmlPart[]; chars: number } | { kind: 'silence'; seconds: number }> = []
+  let current: SsmlPart[] = []
+
+  const flush = () => {
+    // Висящая пауза в хвосте куска ничего не даёт — режем её в отдельную тишину.
+    while (current.length && !('text' in current[current.length - 1])) current.pop()
+    if (!current.length) return
+    const chars = current.reduce((n, p) => ('text' in p ? n + p.text.length : n), 0)
+    out.push({ kind: 'speak', parts: current, chars })
+    current = []
+  }
+
+  for (const s of segments) {
+    if (s.kind === 'text') {
+      if (current.length) current.push({ text: ' ' })
+      current.push({ text: s.text })
+      continue
+    }
+    if (inlineOk && s.seconds < inlineThresholdSec && current.length) {
+      current.push({ breakSec: s.seconds })
+    } else {
+      flush()
+      out.push({ kind: 'silence', seconds: s.seconds })
+    }
+  }
+  flush()
+  return out
 }
 
 type AzureCreds = { key: string; region: string }
@@ -145,7 +234,7 @@ export function azureCreds(): AzureCreds {
  * Синтезирует один кусок. Возвращает сырой PCM-WAV 48 кГц моно — так между
  * кусками и тишиной нет перекодирования, и склейка получается без щелчков.
  */
-export async function synthesize(text: string, v: VoiceParams, attempt = 1): Promise<Buffer> {
+export async function synthesize(text: SsmlPart[] | string, v: VoiceParams, attempt = 1): Promise<Buffer> {
   const { key, region } = azureCreds()
   const res = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
     method: 'POST',

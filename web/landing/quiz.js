@@ -302,6 +302,8 @@
   function watchSticky(section) {
     var sticky = document.querySelector('.js-sticky-cta');
     if (!sticky || typeof window.IntersectionObserver !== 'function') { return; }
+    /* Порог по площади не годится: секция теста выше экрана, и «видно 12 процентов»
+       может не случиться никогда. Поэтому сужаем область наблюдения полями. */
     var observer = new IntersectionObserver(function (entries) {
       for (var i = 0; i < entries.length; i++) {
         if (entries[i].isIntersecting) {
@@ -310,7 +312,7 @@
           sticky.classList.remove('is-hidden');
         }
       }
-    }, { threshold: 0.12 });
+    }, { threshold: 0, rootMargin: '-96px 0px -96px 0px' });
     observer.observe(section);
   }
 
@@ -332,7 +334,7 @@
 
     /* --- состояние 1: приглашение --- */
     var intro = el('div', 'quiz-stage quiz-intro');
-    var startBtn = el('button', 'quiz-btn quiz-start', 'Начать');
+    var startBtn = el('button', 'btn btn--primary quiz-btn quiz-start', 'Начать');
     startBtn.type = 'button';
     var introDots = el('div', 'dots');
     intro.appendChild(startBtn);
@@ -389,7 +391,7 @@
     var nav = el('div', 'quiz-nav');
     var backBtn = el('button', 'quiz-btn quiz-btn-ghost quiz-back is-invisible', 'назад');
     backBtn.type = 'button';
-    var nextBtn = el('button', 'quiz-btn quiz-next', 'Дальше');
+    var nextBtn = el('button', 'btn btn--primary quiz-btn quiz-next', 'Дальше');
     nextBtn.type = 'button';
     nextBtn.disabled = true;
     nav.appendChild(backBtn);
@@ -418,7 +420,7 @@
     verdict.setAttribute('aria-live', 'polite');
     var disclaimer = el('p', 'quiz-disclaimer', DISCLAIMER);
 
-    var botLink = el('a', 'quiz-btn js-bot-link', 'Открыть семь вечеров в Telegram');
+    var botLink = el('a', 'btn btn--primary quiz-btn js-bot-link', 'Открыть семь вечеров в Telegram');
     botLink.setAttribute('href', BOT_URL);
     botLink.setAttribute('rel', 'noopener');
 
@@ -636,7 +638,10 @@
 
     function finish() {
       var sum = 0;
-      for (var i = 0; i < TOTAL; i++) { sum += answers[i]; }
+      for (var i = 0; i < TOTAL; i++) {
+        if (answers[i] === null) { return; } /* страховка: без всех семи ответов результата нет */
+        sum += answers[i];
+      }
       writeStored(answers.slice(), sum);
       showResult(sum, !reduced);
     }

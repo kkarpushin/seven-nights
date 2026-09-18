@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Голоса для «Семи ночей»</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 32px 20px 64px; background: #10131c; color: #e8e6f0;
+         font: 16px/1.6 ui-sans-serif, system-ui, "Noto Sans", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 8px; }
+  .lead { color: #9a98ad; margin: 0 0 32px; }
+  ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 20px; }
+  li { background: #171b27; border: 1px solid #262c3d; border-radius: 16px; padding: 20px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+  li p { color: #9a98ad; margin: 0 0 14px; font-size: 15px; }
+  audio { width: 100%; }
+  code { display: block; margin-top: 10px; color: #6f6c85; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Какой голос у «Семи ночей»</h1>
+  <p class="lead">Один и тот же кусок практики, пять голосов. Выбери один — его слышит человек все семь вечеров.<br>
+  Текст образца: запасной текст (сценариев ещё нет). Смена голоса после выбора занимает одну строку и одну перегенерацию.</p>
+  <ul>
+    <li>
+      <h2>Маша (HD), стиль «забота»</h2>
+      <p>Генеративный голос нового поколения — самый живой и тёплый. Не поддаётся замедлению и не уважает теги пауз, но паузы мы всё равно делаем склейкой.</p>
+      <audio controls preload="none" src="masha-hd-caring.mp3"></audio>
+      <code>ru-RU-Masha:MAI-Voice-2 · caringempathy</code>
+    </li>
+    <li>
+      <h2>Маша (HD), стиль «размышление»</h2>
+      <p>Тот же голос, более отстранённая подача. Вариант, если «забота» покажется слишком мягкой.</p>
+      <audio controls preload="none" src="masha-hd-reflective.mp3"></audio>
+      <code>ru-RU-Masha:MAI-Voice-2 · reflective</code>
+    </li>
+    <li>
+      <h2>Светлана</h2>
+      <p>Классический голос: ровный, предсказуемый, темп ровно медитативный (примерно сто слов в минуту). Слушается спокойно, но менее «живой».</p>
+      <audio controls preload="none" src="svetlana.mp3"></audio>
+      <code>ru-RU-SvetlanaNeural</code>
+    </li>
+    <li>
+      <h2>Дарья</h2>
+      <p>Мягче Светланы, чуть выше тембр.</p>
+      <audio controls preload="none" src="dariya.mp3"></audio>
+      <code>ru-RU-DariyaNeural</code>
+    </li>
+    <li>
+      <h2>Маша (Flash), стиль «забота»</h2>
+      <p>Быстрая версия генеративного голоса — запасной вариант.</p>
+      <audio controls preload="none" src="masha-flash-caring.mp3"></audio>
+      <code>ru-RU-Masha:MAI-Voice-2-Flash · caringempathy</code>
+    </li>
+  </ul>
+</main>
+</body>
+</html>
