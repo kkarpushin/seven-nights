@@ -263,3 +263,80 @@ describe('удаление истории', () => {
     expect((db.prepare('SELECT COUNT(*) c FROM evenings WHERE tg_id = ?').get(ID) as any).c).toBe(0)
   })
 })
+
+describe('пропуск вечера', () => {
+  const ID = 777005
+  const who = { ...from, id: ID }
+  const where = { ...chat, id: ID }
+  const say = (t: string) => bot.handleUpdate({ update_id: updateId++, message: msg(t, who, where) } as any)
+  const press = (data: string) =>
+    bot.handleUpdate({
+      update_id: updateId++,
+      callback_query: {
+        id: String(updateId), from: who, chat_instance: '1', data,
+        message: { message_id: updateId, date: Math.floor(Date.now() / 1000), chat: where, text: '.' },
+      },
+    } as any)
+
+  /** Сдвигает любой назначенный срок в прошлое и запускает тик планировщика. */
+  const advance = async () => {
+    db.prepare('UPDATE users SET due_at = ? WHERE tg_id = ? AND due_at IS NOT NULL')
+      .run(Math.floor(Date.now() / 1000) - 1, ID)
+    await tick()
+  }
+
+  it('программа сдвигается, а не пропадает: номер вечера не растёт', async () => {
+    await say('/start')
+    await say('21:00')
+    await say('18:42')
+
+    // Первый вечер проходим целиком.
+    await say('4')
+    await press('cat:sleep')
+    await press('done')
+    await say('6')
+    expect(user(ID).evening_no).toBe(1)
+
+    // Второй вечер приходит — и человек на него не отвечает.
+    await advance()
+    expect(user(ID).state).toBe('awaiting_before')
+    sent.length = 0
+    await advance()                       // наступил срок пропуска
+
+    expect(user(ID).state).toBe('idle')
+    expect(user(ID).evening_no, 'вечер не засчитан — номер остался прежним').toBe(1)
+    expect(user(ID).skips).toBe(1)
+    expect(sent, 'за пропуск бот не отчитывает и вообще молчит').toHaveLength(0)
+  })
+
+  it('следующий вечер начинается с «вчера не получилось» и это ТОТ ЖЕ вечер', async () => {
+    sent.length = 0
+    await advance()
+    const texts = sent.map((s) => s.payload.text || '').join('\n')
+    expect(texts).toContain('Вчера не получилось, это нормально')
+    expect(texts).toContain('Вечер 2 из 7')      // не третий: программа сдвинулась
+  })
+
+  it('человек доходит до практики — серия пропусков обнуляется', async () => {
+    await say('5')
+    await press('cat:calm')
+    expect(user(ID).evening_no).toBe(2)
+    expect(user(ID).skips).toBe(0)
+  })
+
+  it('после двух пропусков подряд формулировка меняется', async () => {
+    await press('done')
+    await say('7')                        // закрыли второй вечер
+    await advance()                       // пришёл третий
+    await advance()                       // пропустил
+    await advance()                       // пришёл снова
+    await advance()                       // пропустил второй раз
+    expect(user(ID).skips).toBe(2)
+    sent.length = 0
+    await advance()
+    const texts = sent.map((s) => s.payload.text || '').join('\n')
+    expect(texts).toContain('Несколько дней не получилось')
+    expect(texts).toContain('Вечер 3 из 7')      // всё ещё третий
+    expect(user(ID).evening_no).toBe(2)
+  })
+})

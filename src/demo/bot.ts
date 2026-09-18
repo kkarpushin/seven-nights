@@ -90,13 +90,15 @@ CREATE TABLE IF NOT EXISTS file_ids (slug TEXT PRIMARY KEY, file_id TEXT NOT NUL
 // База могла быть создана до появления колонки — добавляем на месте, без миграций.
 const hasKind = (db.prepare("PRAGMA table_info(users)").all() as { name: string }[]).some((c) => c.name === 'cur_kind')
 if (!hasKind) db.exec("ALTER TABLE users ADD COLUMN cur_kind TEXT NOT NULL DEFAULT 'evening'")
+const hasSkips = (db.prepare("PRAGMA table_info(users)").all() as { name: string }[]).some((c) => c.name === 'skips')
+if (!hasSkips) db.exec('ALTER TABLE users ADD COLUMN skips INTEGER NOT NULL DEFAULT 0')
 
 type User = {
   tg_id: number; tz_offset_min: number; evening_time: string; state: string
   due_at: number | null; due_kind: string | null; evening_no: number; demo: number
   quiz_sum: number | null; quiz_index: number | null
   cur_before: number | null; cur_category: string | null; cur_practice: string | null
-  cur_kind: string; practice_msg_id: number | null; created_at: number
+  cur_kind: string; skips: number; practice_msg_id: number | null; created_at: number
 }
 
 const q = {
@@ -215,6 +217,10 @@ const T = {
   before: (n: number) => `Добрый вечер. Вечер ${n} из 7. Как ты сейчас, от 0 до 10?`,
   beforeHalf: 'Добрый вечер. Четвёртый вечер, половина пути. Как ты сейчас, от 0 до 10?',
   beforeLast: 'Добрый вечер. Седьмой вечер, последний. Как ты сейчас, от 0 до 10?',
+  beforeAfterSkip: (n: number) =>
+    `Вчера не получилось, это нормально. Продолжим с того места, где остановились. Вечер ${n} из 7. Как ты сейчас, от 0 до 10?`,
+  beforeAfterSkips: (n: number) =>
+    `Несколько дней не получилось, это нормально. Продолжим с того места, где остановились. Вечер ${n} из 7. Как ты сейчас, от 0 до 10?`,
   beforeAck: (v: number) => `Записала: ${v}  ${bar(v)}\nЧто сегодня ближе?`,
   stateAck: (label: string) => `Сегодня: ${label.toLowerCase()}`,
   caption: (p: Practice, n: number, first: boolean) =>
@@ -400,8 +406,18 @@ async function askBefore(tgId: number) {
   const u = user(tgId)
   const n = u.evening_no + 1
   const text =
-    n === 1 ? T.beforeFirst : n === 4 ? T.beforeHalf : n === 7 ? T.beforeLast : T.before(n)
-  set(tgId, { state: 'awaiting_before', due_at: null, due_kind: null, cur_kind: 'evening' })
+    u.skips === 1 ? T.beforeAfterSkip(n)
+    : u.skips > 1 ? T.beforeAfterSkips(n)
+    : n === 1 ? T.beforeFirst
+    : n === 4 ? T.beforeHalf
+    : n === 7 ? T.beforeLast
+    : T.before(n)
+  // Срок пропуска ставится вместе с вопросом: если человек не дойдёт до практики,
+  // вечер закроется сам, программа сдвинется, а номер вечера останется прежним.
+  set(tgId, {
+    state: 'awaiting_before', cur_kind: 'evening',
+    due_at: now() + (u.demo ? 180 : 8 * 3600), due_kind: 'skip',
+  })
   await bot.api.sendMessage(tgId, text, { reply_markup: numbers() })
 }
 
@@ -431,6 +447,7 @@ async function sendPractice(tgId: number, category: string) {
 
   // Вечер засчитан в момент успешной отправки аудио — не по кнопке и не по замеру «после».
   q.addEvening.run(tgId, isNow ? 0 : n, category, p.slug, u.cur_before, now())
+  if (!isNow) set(tgId, { skips: 0 })   // вечер засчитан — серия пропусков прервана
   set(tgId, {
     state: 'practicing', evening_no: isNow ? u.evening_no : n, cur_practice: p.slug, practice_msg_id: msg.message_id,
     due_at: now() + Math.max(timings(u).afterPracticeSec, u.demo ? 0 : p.duration + 120),
@@ -669,6 +686,15 @@ export const tick = async () => {
       if (u.due_kind === 'evening') {
         set(u.tg_id, { due_at: null, due_kind: null })
         await askBefore(u.tg_id)
+      } else if (u.due_kind === 'skip') {
+        // Практика так и не ушла. Вечер НЕ засчитываем и номер не двигаем:
+        // программа сдвигается, человек всё равно пройдёт все семь.
+        const nextAt = u.demo ? now() + timings(u).nextEveningSec : nextEveningAt(u)
+        set(u.tg_id, {
+          state: 'idle', skips: u.skips + 1, cur_before: null, cur_category: null,
+          due_at: nextAt, due_kind: 'evening',
+        })
+        // Молча: следующим сообщением человек увидит «Вчера не получилось, это нормально».
       } else if (u.due_kind === 'category') {
         // Не выбрал состояние — не повод терять вечер: молча даём сон.
         set(u.tg_id, { due_at: null, due_kind: null })
