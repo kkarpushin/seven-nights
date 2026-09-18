@@ -115,6 +115,27 @@ export function tx<T>(db: Db, fn: () => T): T {
   return db.transaction(fn)()
 }
 
+/**
+ * Сборка частичного UPDATE из объекта-патча.
+ * Белый список колонок обязателен: патч приходит в том числе из админки, и без
+ * него PATCH с полем `id` или `created_at` переписал бы то, что переписывать нельзя.
+ */
+export function setClause<T extends object>(
+  patch: Partial<T>,
+  allowed: readonly (keyof T & string)[],
+): { sql: string; values: unknown[] } {
+  const parts: string[] = []
+  const values: unknown[] = []
+  for (const key of allowed) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue
+    const v = (patch as Record<string, unknown>)[key]
+    if (v === undefined) continue
+    parts.push(`${key} = ?`)
+    values.push(v === null ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v)
+  }
+  return { sql: parts.join(', '), values }
+}
+
 /** VACUUM INTO — снимок базы без остановки процесса, безопасен при WAL. */
 export function vacuumInto(db: Db, targetPath: string): void {
   db.prepare('VACUUM INTO ?').run(targetPath)
