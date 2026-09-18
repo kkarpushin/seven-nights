@@ -234,7 +234,23 @@ async function main() {
       `${p.slug.padEnd(16)} ${String(chars).padStart(5)} зн. · ${String(chunks).padStart(3)} запросов · пауз ${Math.round(pauseSec)}с · профиль ${prof}` +
         (fresh && !args.force ? ' · уже готово' : ''),
     )
-    if (args.dryRun || (fresh && !args.force)) continue
+    if (args.dryRun) continue
+
+    if (fresh && !args.force) {
+      // Звук перегенерировать не надо, но шапка сценария могла измениться: название,
+      // категория и особенно intro — те две строки, которые бот шлёт вместе с аудио.
+      // Если их не обновить, специалист правит подпись, а человек получает старую.
+      const prev = manifest[p.slug]
+      const metaChanged =
+        prev.title !== p.title || prev.category !== p.category ||
+        JSON.stringify(prev.intro) !== JSON.stringify(p.intro)
+      if (metaChanged) {
+        manifest[p.slug] = { ...prev, title: p.title, category: p.category, intro: p.intro }
+        writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n')
+        console.log('   → обновлена шапка (название, категория, подписи)')
+      }
+      continue
+    }
 
     await renderPractice(p, voice, plan, outMp3)
     const duration = ffprobeDuration(outMp3)
