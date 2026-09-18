@@ -140,6 +140,7 @@
 }
 
 .quiz-btn[disabled]:hover {
+  background: transparent;
   transform: none;
 }
 

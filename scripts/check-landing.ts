@@ -35,7 +35,11 @@ const CASES: Case[] = [
 
 async function cdp(): Promise<{ send: (method: string, params?: unknown) => Promise<any>; close: () => void; logs: string[] }> {
   const list = await fetch(`http://127.0.0.1:${PORT}/json/list`).then((r) => r.json() as Promise<any[]>)
-  const page = list.find((t) => t.type === 'page')
+  // Берём вкладку с НАШЕЙ страницей, а не первую попавшуюся: headless-Chrome
+  // держит рядом служебные target'ы, и на пустом about:blank проверка падала
+  // с «querySelector вернул null» — при живой и здоровой странице.
+  const pages = list.filter((t) => t.type === 'page')
+  const page = pages.find((t) => typeof t.url === 'string' && t.url.startsWith(URL_.replace(/\/$/, ''))) ?? pages[0]
   if (!page) throw new Error('не нашёл вкладку в Chrome')
   const ws = new WebSocket(page.webSocketDebuggerUrl)
   const pending = new Map<number, { ok: (v: any) => void; err: (e: Error) => void }>()
@@ -133,7 +137,17 @@ async function main() {
     }
 
     const { send, close, logs } = await cdp()
-    await evaluate(send, '1')
+
+    // Ждём, пока страница реально соберётся: отладочный порт открывается раньше,
+    // чем грузится документ, и проверка успевала стартовать на пустом body.
+    // Ориентир — содержимое блока теста: его рисует quiz.js, то есть готово всё.
+    let ready = false
+    for (let i = 0; i < 60; i++) {
+      ready = Boolean(await evaluate(send, `!!document.querySelector('#quiz .quiz-card, #quiz .quiz-inner')`))
+      if (ready) break
+      await new Promise((r) => setTimeout(r, 250))
+    }
+    if (!ready) throw new Error('страница не собралась за 15 секунд: блок теста пуст')
 
     // Заголовок и плейсхолдеры — видны сразу, проверяем до прохождения теста.
     const page = await evaluate(send, 'document.body.innerText')
@@ -168,7 +182,14 @@ async function main() {
     close()
   } finally {
     if (chrome?.pid) process.kill(chrome.pid)   // только свой процесс, по сохранённому pid
-    rmSync(profile, { recursive: true, force: true })
+    // Chrome дописывает профиль ещё пару мгновений после SIGTERM, и rmSync падает
+    // на ENOTEMPTY уже после того, как все проверки прошли. Уборка не должна
+    // ронять результат — пробуем, а не получилось, оставляем во временной папке.
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    } catch {
+      /* временный профиль подчистит система */
+    }
   }
   console.log(failures ? `\nПровалено проверок: ${failures}` : '\nВсе проверки пройдены.')
   process.exit(failures ? 1 : 0)

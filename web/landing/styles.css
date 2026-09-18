@@ -960,3 +960,36 @@ a { color: inherit; }
   .js-reveal .reveal { opacity: 1; transform: none; }
   .sticky-cta.is-stuck { transform: none; }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Кнопки Telegram в макете диалога (§1.3).
+
+   Выбор состояния — то, чем программа отличается от папки с файлами, поэтому
+   на странице он показан теми же кнопками, что человек увидит в чате: подпись
+   один в один из текстов бота, выбранная подсвечена акцентом.
+   ────────────────────────────────────────────────────────────────────────── */
+.tg-buttons {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  max-width: 320px;
+}
+
+.tg-button {
+  padding: 11px 14px;
+  border-radius: var(--r-sm);
+  background: rgba(var(--moon-rgb), .05);
+  border: 1px solid rgba(var(--moon-rgb), .12);
+  color: var(--moon);
+  font-size: var(--fs-chat);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* Выбранная кнопка: без заливки целиком — в Telegram выбор виден по тому, что
+   сообщение схлопнулось, а не по цвету. Здесь достаточно акцентной рамки. */
+.tg-button--picked {
+  border-color: rgba(var(--lamp-rgb), .55);
+  color: var(--lamp);
+  background: rgba(var(--lamp-rgb), .08);
+}
