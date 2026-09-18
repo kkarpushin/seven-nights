@@ -37,3 +37,13 @@ export const MINUTE_FORMS: PluralForms = ['минута', 'минуты', 'ми�
 export function divisionWord(n: number): string {
   return plural(n, DIVISION_FORMS)
 }
+
+/**
+ * Значение служебного плейсхолдера {вопрос} в quiz.resume_offer.
+ * Тот же приём, что и {деление}: склонение считает бот, в тексте админки
+ * стоит плейсхолдер — иначе владелец, правя формулировку, обязан был бы
+ * держать в голове три формы.
+ */
+export function questionWord(n: number): string {
+  return plural(n, QUESTION_FORMS)
+}
