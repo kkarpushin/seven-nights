@@ -524,3 +524,19 @@
     transform: none;
   }
 }
+
+/* Возврат к предыдущему вопросу — карточка едет в обратную сторону. */
+.quiz-slide.is-out.is-back {
+  transform: translateX(24px);
+}
+
+.quiz-slide.is-in.is-back {
+  transform: translateX(-24px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-slide.is-out.is-back,
+  .quiz-slide.is-in.is-back {
+    transform: none;
+  }
+}

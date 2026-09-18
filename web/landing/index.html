@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Семь ночей — семь вечеров, одна практика в вечер, в Telegram</title>
+<meta name="description" content="Каждый вечер в Telegram приходит одна практика. Ложишься, надеваешь наушники, слушаешь. До и после отвечаешь одной цифрой, как ты. Через неделю видишь свой график: с чего всё началось и где ты сейчас.">
+<meta name="theme-color" content="#0F1233">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Семь ночей, чтобы выдохнуть">
+<meta property="og:description" content="Каждый вечер в Telegram приходит одна практика. Ложишься, надеваешь наушники, слушаешь. До и после отвечаешь одной цифрой, как ты. Через неделю видишь свой график: с чего всё началось и где ты сейчас.">
+<meta property="og:image" content="og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ru_RU">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prata&family=Golos+Text:wght@400;500;600&display=swap">
+
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="quiz.css">
+</head>
+<body>
+
+<!-- Иконка Telegram один раз в <defs>, дальше переиспользуется через <use> -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <symbol id="i-tg" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M21.6 3.4 2.9 10.6c-.9.35-.9 1.62.02 1.93l4.62 1.55 1.77 5.4c.24.72 1.16.9 1.66.33l2.44-2.79 4.7 3.45c.62.45 1.5.12 1.66-.63l3.1-14.6c.18-.85-.65-1.55-1.27-1.84ZM9.2 14.3l9-5.9-7.1 6.6-.33 3.1-1.57-3.8Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- 1.0 Шапка -->
+<header class="site-head">
+  <div class="wrap site-head__inner">
+    <a class="wordmark" href="#top">Семь ночей</a>
+    <a class="head-link js-bot-link" href="https://t.me/ensoma_robot">Открыть в Telegram</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- 1.1 Hero -->
+  <section class="section hero" aria-labelledby="hero-title">
+    <div class="wrap hero__grid">
+
+      <div class="hero__text">
+        <p class="eyebrow reveal">Семь вечеров подряд · одна аудиопрактика в вечер · в Telegram</p>
+        <h1 class="hero__title reveal" id="hero-title">Семь ночей, чтобы выдохнуть</h1>
+        <p class="lead reveal">Каждый вечер в Telegram приходит одна практика. Ложишься, надеваешь наушники, слушаешь. До и после отвечаешь одной цифрой, как ты. Через неделю видишь свой график: с чего всё началось и где ты сейчас.</p>
+
+        <div class="cta-group reveal">
+          <a class="btn btn--primary js-hero-cta" href="#quiz">Пройти тест · 2 минуты</a>
+          <a class="btn btn--ghost js-bot-link" href="https://t.me/ensoma_robot">
+            <svg class="btn__icon" aria-hidden="true" focusable="false"><use href="#i-tg"></use></svg>
+            Сразу открыть в Telegram
+          </a>
+        </div>
+        <p class="cta-note reveal">Семь вопросов с ползунками. Ничего не нужно заполнять, ни почты, ни регистрации.</p>
+      </div>
+
+      <figure class="hero__figure reveal">
+        <!-- Слот сигнатурного графика: содержимое рисует chart.js -->
+        <div id="hero-chart" class="hero-chart" role="img" aria-label="График семи вечеров: линия «до» и линия «после». Пример."></div>
+        <figcaption class="caption hero__caption">Так выглядит график на седьмой вечер. Пример.</figcaption>
+        <p class="bigline">Было 4. Стало 7.</p>
+      </figure>
+
+    </div>
+  </section>
+
+  <div class="divider" aria-hidden="true"><div class="dots" data-dots="7" data-filled="0"></div></div>
+
+  <!-- 1.2 Для кого это -->
+  <section class="section" aria-labelledby="known-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="known-title">Если знакомо</h2>
+      <ul class="known reveal">
+        <li>Ложишься и лежишь. Голова не выключается.</li>
+        <li>Днём всё держишь, а вечером внутри сжато и не отпускает.</li>
+        <li>Утром впереди разговор или день, к которому нужно собраться.</li>
+      </ul>
+      <p class="known__bridge reveal">Семь ночей — не про «взять себя в руки». Про то, чтобы дать телу двадцать минут и посмотреть, что изменится.</p>
+    </div>
+  </section>
+
+  <div class="divider" aria-hidden="true"><div class="dots" data-dots="7" data-filled="0"></div></div>
+
+  <!-- 1.25 Тест. Секция намеренно пустая: всю разметку внутри строит quiz.js -->
+  <section id="quiz" class="quiz-section" aria-labelledby="quiz-title"></section>
+
+  <!-- 1.3 Как это работает -->
+  <section class="section" aria-labelledby="evening-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="evening-title">Что будет каждый вечер</h2>
+      <p class="lead reveal">Один раз выбираешь удобный час, например 21:00. Дальше бот пишет сам. Вот как выглядит вечер.</p>
+
+      <p class="chip reveal">
+        <span class="chip__label">Вечер 1 из 7</span>
+        <span class="dots" data-dots="7" data-filled="1"></span>
+      </p>
+
+      <div class="chat">
+        <div class="bubble bubble--bot bubble--muted reveal" style="--reveal-delay:0ms">Открыла тебе семь вечеров. Ничего готовить не надо: наушники и кровать. Во сколько тебе удобно получать практику? Напиши час, например 21:00.</div>
+
+        <h3 class="step-label reveal" style="--reveal-delay:120ms">Шаг 1 · в твой час: замер «до»</h3>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:120ms">Добрый вечер. Как ты сейчас, от 0 до 10? Просто цифра.</div>
+        <div class="bubble bubble--me bubble--num reveal" style="--reveal-delay:240ms">4</div>
+
+        <h3 class="step-label reveal" style="--reveal-delay:0ms">Шаг 2 · практика</h3>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:0ms">Спасибо. Вот практика на сегодня. Ложись, надень наушники и просто слушай.</div>
+        <div class="bubble bubble--bot bubble--audio reveal" style="--reveal-delay:120ms">
+          <div class="audio-msg" aria-hidden="true">
+            <span class="audio-msg__play">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5 3.2v9.6c0 .5.55.8.97.53l7.3-4.8a.63.63 0 0 0 0-1.06l-7.3-4.8A.63.63 0 0 0 5 3.2Z"/></svg>
+            </span>
+            <svg class="wave" viewBox="0 0 200 24" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y="4.0" width="2.6" height="15.9" rx="1.3"/><rect x="5" y="3.2" width="2.6" height="17.6" rx="1.3"/><rect x="10" y="3.2" width="2.6" height="17.6" rx="1.3"/><rect x="15" y="1.1" width="2.6" height="21.9" rx="1.3"/><rect x="20" y="4.9" width="2.6" height="14.2" rx="1.3"/><rect x="25" y="7.9" width="2.6" height="8.2" rx="1.3"/><rect x="30" y="6.2" width="2.6" height="11.7" rx="1.3"/><rect x="35" y="7.5" width="2.6" height="9.0" rx="1.3"/><rect x="40" y="6.2" width="2.6" height="11.7" rx="1.3"/><rect x="45" y="1.6" width="2.6" height="20.9" rx="1.3"/><rect x="50" y="3.1" width="2.6" height="17.9" rx="1.3"/><rect x="55" y="4.3" width="2.6" height="15.3" rx="1.3"/><rect x="60" y="4.2" width="2.6" height="15.6" rx="1.3"/><rect x="65" y="9.0" width="2.6" height="6.0" rx="1.3"/><rect x="70" y="9.1" width="2.6" height="5.8" rx="1.3"/><rect x="75" y="7.1" width="2.6" height="9.8" rx="1.3"/><rect x="80" y="7.6" width="2.6" height="8.8" rx="1.3"/><rect x="85" y="4.9" width="2.6" height="14.2" rx="1.3"/><rect x="90" y="1.4" width="2.6" height="21.1" rx="1.3"/><rect x="95" y="4.5" width="2.6" height="14.9" rx="1.3"/><rect x="100" y="5.7" width="2.6" height="12.6" rx="1.3"/><rect x="105" y="5.7" width="2.6" height="12.7" rx="1.3"/><rect x="110" y="9.1" width="2.6" height="5.8" rx="1.3"/><rect x="115" y="7.5" width="2.6" height="9.0" rx="1.3"/><rect x="120" y="3.6" width="2.6" height="16.9" rx="1.3"/><rect x="125" y="4.0" width="2.6" height="15.9" rx="1.3"/><rect x="130" y="1.7" width="2.6" height="20.6" rx="1.3"/><rect x="135" y="1.0" width="2.6" height="22.0" rx="1.3"/><rect x="140" y="5.8" width="2.6" height="12.3" rx="1.3"/><rect x="145" y="6.8" width="2.6" height="10.3" rx="1.3"/><rect x="150" y="7.0" width="2.6" height="9.9" rx="1.3"/><rect x="155" y="9.1" width="2.6" height="5.8" rx="1.3"/><rect x="160" y="6.2" width="2.6" height="11.6" rx="1.3"/><rect x="165" y="3.2" width="2.6" height="17.7" rx="1.3"/><rect x="170" y="4.8" width="2.6" height="14.3" rx="1.3"/><rect x="175" y="3.4" width="2.6" height="17.1" rx="1.3"/><rect x="180" y="4.7" width="2.6" height="14.6" rx="1.3"/><rect x="185" y="9.1" width="2.6" height="5.8" rx="1.3"/><rect x="190" y="8.6" width="2.6" height="6.9" rx="1.3"/><rect x="195" y="7.5" width="2.6" height="9.0" rx="1.3"/></svg>
+            <span class="audio-msg__time">18:24</span>
+          </div>
+          <p class="audio-msg__text">[[Две строки к практике первого вечера — заменим текстом специалиста]]</p>
+        </div>
+
+        <div class="audio-sample reveal" style="--reveal-delay:240ms">
+          <p class="audio-sample__label">Послушать 30 секунд</p>
+          <audio class="audio-sample__player" controls preload="none" aria-label="Послушать 30 секунд, фрагмент первой практики">
+            <source src="audio/practice-1-fragment.mp3" type="audio/mpeg">
+          </audio>
+          <p class="caption">Голос [[Анны]]. Фрагмент первой практики.</p>
+        </div>
+
+        <h3 class="step-label reveal" style="--reveal-delay:0ms">Шаг 3 · замер «после»</h3>
+        <p class="step-note reveal" style="--reveal-delay:0ms">Когда нажмёшь «Я сделал(а)» или через двадцать минут.</p>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:120ms">А сейчас как, от 0 до 10?</div>
+        <div class="bubble bubble--me bubble--num reveal" style="--reveal-delay:240ms">6</div>
+
+        <h3 class="step-label reveal" style="--reveal-delay:0ms">Шаг 4</h3>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:0ms">Записала. До завтра.</div>
+      </div>
+
+      <p class="caption chat__caption reveal">Две цифры в день. Больше от тебя ничего не нужно.</p>
+    </div>
+  </section>
+
+  <!-- 1.4 Три состояния -->
+  <section class="section" aria-labelledby="states-title">
+    <div class="wrap">
+      <div class="col">
+        <h2 class="h2 reveal" id="states-title">Практика под то, как ты сейчас</h2>
+        <p class="lead reveal">Вечером по умолчанию — сон и расслабление. Но бывает нужно другое. Перед практикой бот спросит одной кнопкой, что сейчас ближе.</p>
+      </div>
+
+      <ul class="cards">
+        <li class="card reveal" style="--reveal-delay:0ms">
+          <p class="card__emoji" aria-hidden="true">😴</p>
+          <h3 class="card__title">Сон и расслабление</h3>
+          <p class="card__text">Когда голова не выключается. Вечер, перед сном.</p>
+          <p class="card__note">по умолчанию</p>
+        </li>
+        <li class="card reveal" style="--reveal-delay:120ms">
+          <p class="card__emoji" aria-hidden="true">🌿</p>
+          <h3 class="card__title">Тревога и стресс</h3>
+          <p class="card__text">Когда внутри сжато и не отпускает. Утром или вечером.</p>
+        </li>
+        <li class="card reveal" style="--reveal-delay:240ms">
+          <p class="card__emoji" aria-hidden="true">🌅</p>
+          <h3 class="card__title">Настроиться на день</h3>
+          <p class="card__text">Перед важным разговором или просто трудным днём. Утром.</p>
+        </li>
+      </ul>
+
+      <p class="col cards__note reveal">Нужно днём, не дожидаясь вечера — нажми «Практика сейчас». Такой раз не занимает один из семи вечеров, но бот так же запишет две цифры.</p>
+    </div>
+  </section>
+
+  <!-- 1.5 Седьмой вечер -->
+  <section class="section" aria-labelledby="seventh-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="seventh-title">Седьмой вечер</h2>
+      <p class="lead reveal">После второй цифры бот присылает картинку: семь вечеров, две линии, до и после.</p>
+
+      <div class="chat">
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:0ms">Смотри, с чего ты начал и где ты сейчас.</div>
+        <div class="bubble bubble--bot bubble--card reveal" style="--reveal-delay:120ms">
+          <img class="result-card" src="og-card.png" width="1200" height="630" loading="lazy" decoding="async" alt="Карточка седьмого вечера: график семи вечеров, линия «до» и линия «после», подпись «Было 4. Стало 7.» Пример.">
+        </div>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:240ms">Было 4. Стало 7.</div>
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:360ms">
+          Если захочешь разобрать своё, приходи на разговор. Тридцать минут, вдвоём.
+          <a class="bubble__link" href="[[ссылка на страницу разговора]]">[[ссылка на страницу разговора]]</a>
+        </div>
+      </div>
+
+      <p class="caption chat__caption reveal">Картинку можно сохранить или переслать. Разговор — по желанию, не обязательный шаг.</p>
+    </div>
+  </section>
+
+  <!-- 1.6 Что бот про тебя знает -->
+  <section class="section" aria-labelledby="memory-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="memory-title">Что бот про тебя знает</h2>
+      <ul class="memo reveal">
+        <li>час, в который тебе писать</li>
+        <li>какой сейчас вечер из семи</li>
+        <li>по каждому вечеру: цифра до, цифра после, дата</li>
+      </ul>
+      <p class="memo__note reveal">Всё. Ни имени, ни телефона, ни почты. Бот не спрашивает и не запоминает.</p>
+    </div>
+  </section>
+
+  <!-- 1.7 Если что-то пошло не так -->
+  <section class="section" aria-labelledby="skip-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="skip-title">Пропустить вечер — можно</h2>
+      <p class="body reveal">Программа не сгорает и не пропускает практику. На следующий вечер бот напишет:</p>
+      <div class="chat">
+        <div class="bubble bubble--bot reveal" style="--reveal-delay:0ms">Вчера не получилось, это нормально. Продолжим с того места, где остановились?</div>
+      </div>
+      <p class="body reveal">Всё сдвигается на день. Все семь практик остаются твоими. Если нужно остановиться на дольше — есть кнопка «Поставить на паузу» и «Продолжить».</p>
+    </div>
+  </section>
+
+  <!-- 1.8 Кто ведёт -->
+  <section class="section" aria-labelledby="author-title">
+    <div class="wrap col">
+      <div class="author reveal">
+        <img class="author__photo" src="img/author.jpg" width="480" height="480" loading="lazy" decoding="async" alt="[[портрет, квадрат 480×480, тёплый свет]]">
+        <div class="author__body">
+          <h2 class="h2 author__name" id="author-title">[[Анна]]</h2>
+          <p class="body">[[Психолог. Практики записаны её голосом, тексты вечеров — её.]] [[1–2 предложения от специалиста о себе, на «я», без регалий списком]]</p>
+          <p><a class="link" href="[[ссылка]]">Канал [[Анны]] в Telegram →</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1.9 FAQ -->
+  <section class="section" aria-labelledby="faq-title">
+    <div class="wrap col">
+      <h2 class="h2 reveal" id="faq-title">Вопросы</h2>
+
+      <div class="faq reveal">
+        <details class="faq__item">
+          <summary class="faq__q">Сколько времени занимает один вечер?</summary>
+          <div class="faq__a"><p>Практика — около двадцати минут. Плюс две цифры: до и после. Всё вместе — меньше получаса, и почти всё это время ты лежишь.</p></div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__q">Обязательно слушать именно перед сном?</summary>
+          <div class="faq__a"><p>Основная программа — вечерняя, в твой час. Но если нужно утром или днём, нажми «Практика сейчас» и выбери состояние. Такая практика не занимает один из семи вечеров.</p></div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__q">Что если я пропущу вечер?</summary>
+          <div class="faq__a"><p>Ничего страшного. Бот не ругается и не пропускает практику: программа сдвигается на день, и ты проходишь все семь. Можно поставить на паузу и вернуться позже.</p></div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__q">Что нужно, чтобы начать?</summary>
+          <div class="faq__a"><p>Telegram и наушники. Ничего не нужно устанавливать и заполнять. Открываешь бота, пишешь удобный час, вечером приходит первая практика.</p></div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__q">Что бот знает обо мне?</summary>
+          <!-- Последнее предложение — только если в боте будет команда удаления истории.
+               Если её не будет к запуску, удалить фразу «Историю можно попросить удалить.» -->
+          <div class="faq__a"><p>Час, текущий вечер и по каждому вечеру две цифры с датой. Ни имени, ни телефона, ни почты. Историю можно попросить удалить.</p></div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__q">Это заменяет терапию или врача?</summary>
+          <div class="faq__a"><p>Нет. Это семь аудиопрактик и способ увидеть в цифрах, как меняется твоё состояние за неделю. Если тебе тяжело и это длится давно, лучше поговорить со специалистом лично.</p></div>
+        </details>
+
+        <!-- Вопрос про цену — включить вместе с блоком #price, когда вернётся оплата.
+        <details class="faq__item">
+          <summary class="faq__q">Сколько это стоит?</summary>
+          <div class="faq__a"><p>[[X ₽]] за семь вечеров.</p></div>
+        </details>
+        -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Блок цены выключен: оплату из проекта выпилили. Вернуть вместе с вопросом в FAQ.
+  <section id="price" class="section section--price">
+    <h2>Сколько стоит</h2>
+    <p class="price">[[X ₽]] <span class="price__note">за семь вечеров</span></p>
+    <p>Оплата на [[Продамус]], после оплаты — код для бота.</p>
+    <a class="btn btn--primary" href="[[ссылка на оплату]]">Оплатить и получить код</a>
+  </section>
+  -->
+
+  <!-- 1.10 Финальный призыв -->
+  <section class="section final" aria-labelledby="final-title">
+    <div class="wrap col final__inner">
+      <div class="dots dots--final" data-dots="7" data-filled="7" aria-hidden="true"></div>
+      <h2 class="h2 reveal" id="final-title">Первая практика может прийти уже сегодня</h2>
+      <p class="lead reveal">Открой бота, напиши час — например 21:00. В это время придёт первое сообщение.</p>
+      <!-- До прохождения теста ведёт к тесту. После прохождения quiz.js переписывает
+           текст и href этой кнопки на «Открыть семь вечеров в Telegram» с deep link. -->
+      <p class="reveal"><a class="btn btn--primary js-final-cta" href="#quiz">Пройти тест · 2 минуты</a></p>
+      <p class="reveal"><a class="link link--quiet js-bot-link" href="https://t.me/ensoma_robot">Сразу открыть в Telegram</a></p>
+      <p class="cta-note reveal">Семь вечеров. По одной практике. Две цифры в день.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- 1.11 Футер -->
+<footer class="site-foot">
+  <div class="wrap col">
+    <p class="foot__text">«Семь ночей» — программа аудиопрактик. Не является медицинской помощью, диагностикой или лечением и не заменяет консультацию врача или психотерапевта. Если тебе плохо прямо сейчас, обратись за помощью к специалисту или в службу экстренной помощи.</p>
+    <p class="foot__text">Практики слушают лёжа или сидя в спокойном месте. Не слушай за рулём, при управлении техникой и в ситуациях, где нужно внимание.</p>
+    <p class="foot__text">Бот в Telegram: <a class="link link--quiet js-bot-link" href="https://t.me/ensoma_robot">@ensoma_robot</a> · <a class="link link--quiet" href="[[ссылка]]">Канал [[Анны]]</a> · <a class="link link--quiet" href="[[ссылка на страницу разговора]]">[[Разговор, 30 минут]]</a> · <a class="link link--quiet" href="[[Написать: ссылка на личный Telegram]]">[[Написать: ссылка на личный Telegram]]</a></p>
+    <p class="foot__copy">© 2026 [[Анна Фамилия]]</p>
+  </div>
+</footer>
+
+<!-- Липкая мобильная кнопка. quiz.js меняет текст и href после теста
+     и вешает класс is-hidden, когда секция теста в кадре. -->
+<a class="sticky-cta js-sticky-cta" href="#quiz">Пройти тест</a>
+
+<script src="chart.js" defer></script>
+<script src="quiz.js" defer></script>
+
+<script>
+/* Проявление секций при скролле (§2.9, пункт 3) и показ липкой кнопки.
+   Класс js-reveal ставится только при живом JS: без скрипта ничего не прячем. */
+(function () {
+  var root = document.documentElement;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if ('IntersectionObserver' in window && !reduced) {
+    root.classList.add('js-reveal');
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('is-visible');
+        io.unobserve(e.target); // один раз, без повторов
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.08 });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  }
+
+  /* Липкая кнопка: появляется, когда hero-кнопка ушла вверх,
+     и прячется, когда в кадре финальный призыв.
+     Класс is-stuck — наш; is-hidden принадлежит quiz.js и перебивает is-stuck. */
+  var sticky = document.querySelector('.js-sticky-cta');
+  var heroCta = document.querySelector('.js-hero-cta');
+  var finalBlock = document.querySelector('.final');
+  if (!sticky || !heroCta || !('IntersectionObserver' in window)) return;
+
+  var heroVisible = true;
+  var finalVisible = false;
+  function sync() {
+    sticky.classList.toggle('is-stuck', !heroVisible && !finalVisible);
+  }
+  new IntersectionObserver(function (entries) {
+    heroVisible = entries[0].isIntersecting;
+    sync();
+  }, { threshold: 0 }).observe(heroCta);
+
+  if (finalBlock) {
+    new IntersectionObserver(function (entries) {
+      finalVisible = entries[0].isIntersecting;
+      sync();
+    }, { threshold: 0 }).observe(finalBlock);
+  }
+})();
+</script>
+
+<!--
+  ПЛЕЙСХОЛДЕРЫ, которые надо заменить перед запуском:
+  [[Анна]]                — имя специалиста, H2 в блоке «Кто ведёт»
+  [[Анны]]                — имя в родительном падеже: подпись под аудио, ссылка на канал, футер
+  [[Анна Фамилия]]        — имя и фамилия в копирайте футера
+  [[Психолог. Практики записаны её голосом, тексты вечеров — её.]]  — строка о специалисте
+  [[1–2 предложения от специалиста о себе, на «я», без регалий списком]]
+  [[портрет, квадрат 480×480, тёплый свет]]  — alt и файл img/author.jpg
+  [[ссылка]]              — ссылка на канал специалиста в Telegram (блок 1.8 и футер)
+  [[ссылка на страницу разговора]]  — страница записи на разговор (блок 1.5 и футер)
+  [[Разговор, 30 минут]]  — подпись ссылки на разговор в футере
+  [[Написать: ссылка на личный Telegram]]  — личный Telegram специалиста, футер
+  [[Две строки к практике первого вечера — заменим текстом специалиста]]  — блок 1.3, шаг 2
+  [[X ₽]], [[Продамус]], [[ссылка на оплату]]  — в закомментированном блоке цены и вопросе FAQ
+
+  ФАЙЛЫ-ЗАГЛУШКИ, которых пока нет рядом с index.html:
+  audio/practice-1-fragment.mp3  — фрагмент 30 секунд, MP3, около 500 КБ
+  img/author.jpg                 — портрет 480×480
+  og-card.png                    — карточка 1200×630 (она же og:image, она же картинка бота)
+
+  УСЛОВНЫЙ ТЕКСТ:
+  «Историю можно попросить удалить.» в пятом вопросе FAQ — оставить только если
+  в боте появится команда удаления истории.
+-->
+
+</body>
+</html>
