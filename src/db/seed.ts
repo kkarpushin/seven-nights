@@ -7,7 +7,7 @@
  * через INSERT OR IGNORE, практики с origin='admin' пропускаются целиком.
  */
 
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join, relative } from 'node:path'
 import { DEFAULT_SETTINGS, DEFAULT_TEXTS } from './defaultTexts.ts'
@@ -35,7 +35,9 @@ export function seedTexts(repo: TextsRepo, now: number): SeedCounts {
  */
 export function randomSecret(len = 8): string {
   const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789' // без похожих символов: 0/o, 1/l/i
-  const bytes = createHash('sha256').update(String(Math.random()) + String(Date.now())).digest()
+  // randomBytes, а не Math.random: секретом включается демо-режим и, что важнее,
+  // /reset — команда, которая удаляет человека вместе со всей его неделей.
+  const bytes = randomBytes(len)
   let out = ''
   for (let i = 0; i < len; i++) out += alphabet[bytes[i] % alphabet.length]
   return out

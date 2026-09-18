@@ -11,6 +11,8 @@
     "dev:admin": "vite --config web/admin/vite.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "seed": "tsx scripts/seed.ts",
+    "backup": "tsx scripts/backup-db.ts",
     "audio:generate": "tsx scripts/generate-audio.ts",
     "audio:upload": "tsx scripts/upload-audio.ts"
   },

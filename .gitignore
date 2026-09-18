@@ -6,3 +6,7 @@ data/
 content/audio/*.mp3
 content/audio/*.ogg
 .playwright-mcp/
+
+# Сгенерированная озвучка: 82 МБ, пересобирается `npx tsx scripts/generate-audio.ts`
+# (нужен свой ключ Azure Speech). Образцы голосов в content/audio/samples/ оставлены
+# в репозитории намеренно — по ним выбирают голос.
