@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/
+.env
+*.log
+content/audio/*.mp3
+content/audio/*.ogg
+.playwright-mcp/
