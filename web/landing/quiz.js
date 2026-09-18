@@ -308,6 +308,13 @@
       final.setAttribute('href', href);
       final.textContent = 'Открыть семь вечеров в Telegram';
     }
+    /* Кнопка первого экрана по §A остаётся кнопкой к тесту (deep link получают
+       вторичная, финальная и липкая), но звать пройти уже пройденное она не
+       должна: у вернувшегося человека результат показан ниже. */
+    var hero = document.querySelector('.js-hero-cta');
+    if (hero) {
+      hero.textContent = 'Посмотреть результат';
+    }
   }
 
   function resetDeepLink() {
@@ -324,6 +331,10 @@
     if (final) {
       final.setAttribute('href', '#quiz');
       final.textContent = 'Пройти тест · 2 минуты';
+    }
+    var hero = document.querySelector('.js-hero-cta');
+    if (hero) {
+      hero.textContent = 'Пройти тест · 2 минуты';
     }
   }
 
@@ -352,11 +363,15 @@
   function build(section) {
     var inner = el('div', 'quiz-inner');
 
+    /* Шапка блока живёт отдельным узлом: на приглашении она стоит ВНУТРИ
+       карточки (§B1: «карточка с H2, подзаголовком и одной кнопкой „Начать“»),
+       на вопросах и результате — над карточкой. */
+    var head = el('div', 'quiz-head');
     var title = el('h2', 'quiz-title', TITLE);
     title.id = 'quiz-title';
-    inner.appendChild(title);
-    inner.appendChild(el('p', 'quiz-lead', HINT));
-    inner.appendChild(el('p', 'quiz-note', NOTE));
+    head.appendChild(title);
+    head.appendChild(el('p', 'quiz-lead', HINT));
+    head.appendChild(el('p', 'quiz-note', NOTE));
 
     var card = el('div', 'quiz-card');
     card.setAttribute('data-state', 'intro');
@@ -366,6 +381,7 @@
     var startBtn = el('button', 'btn btn--primary quiz-btn quiz-start', 'Начать');
     startBtn.type = 'button';
     var introDots = el('div', 'dots');
+    intro.appendChild(head);
     intro.appendChild(startBtn);
     intro.appendChild(introDots);
 
@@ -433,6 +449,9 @@
     /* --- состояние 3: результат --- */
     var result = el('div', 'quiz-stage quiz-result');
     result.hidden = true;
+    /* Фокус после нажатия «Показать результат» переводим сюда: иначе он падает
+       на начало документа, и до кнопки в бота остаётся десятка два табов. */
+    result.setAttribute('tabindex', '-1');
 
     var ring = el('div', 'quiz-ring');
     var ringArc = el('div', 'quiz-ring-arc');
@@ -446,8 +465,13 @@
 
     var sumLine = el('p', 'quiz-sum', '');
     var verdict = el('p', 'quiz-verdict', '');
-    verdict.setAttribute('aria-live', 'polite');
     var disclaimer = el('p', 'quiz-disclaimer', DISCLAIMER);
+
+    /* Живая область на ВЕСЬ результат. На одном вердикте она озвучивала одно
+       предложение — без индекса, без суммы и без обязательного дисклеймера,
+       а он обязателен под любым результатом. */
+    var announce = el('p', 'quiz-sr');
+    announce.setAttribute('aria-live', 'polite');
 
     var botLink = el('a', 'btn btn--primary quiz-btn js-bot-link', 'Открыть семь вечеров в Telegram');
     botLink.setAttribute('href', BOT_URL);
@@ -457,6 +481,7 @@
     var restart = el('button', 'quiz-link quiz-restart', 'пройти заново');
     restart.type = 'button';
 
+    result.appendChild(announce);
     result.appendChild(ring);
     result.appendChild(sumLine);
     result.appendChild(verdict);
@@ -472,6 +497,9 @@
     section.appendChild(inner);
 
     return {
+      section: section,
+      inner: inner,
+      head: head,
       card: card,
       intro: intro,
       introDots: introDots,
@@ -492,7 +520,8 @@
       ringArc: ringArc,
       ringNumber: ringNumber,
       sumLine: sumLine,
-      verdict: verdict
+      verdict: verdict,
+      announce: announce
     };
   }
 
@@ -536,7 +565,9 @@
       ui.legendMin.textContent = q.min;
       ui.legendMax.textContent = q.max;
       ui.counter.textContent = (current + 1) + ' / ' + TOTAL;
-      paintDots(ui.progressDots, current);
+      /* Заполнено столько же точек, сколько показывает счётчик:
+         «1 / 7» — одна, «7 / 7» — семь (макет §B2). */
+      paintDots(ui.progressDots, current + 1);
 
       ui.range.setAttribute('aria-label', q.text);
       ui.range.value = String(touched ? answer : 5);
@@ -581,8 +612,18 @@
       setFill(value, true);
     }
 
+    /* Вернуть ползунку значение текущего вопроса. Нужно, если по ползунку
+       попали во время слайда: значение не должно уехать вместе с карточкой. */
+    function syncRangeValue() {
+      var answer = answers[current];
+      ui.range.value = String(answer === null ? 5 : answer);
+    }
+
     /* Первое касание включает ответ: до него значения нет. */
     function markTouched() {
+      /* Пока карточка уезжает, ввод не принимаем: current меняется в середине
+         анимации, и нажатие успело бы переписать ответ уже уехавшего вопроса. */
+      if (busy) { syncRangeValue(); return; }
       cancelAuto();
       if (answers[current] === null) {
         answers[current] = parseInt(ui.range.value, 10);
@@ -591,6 +632,7 @@
     }
 
     function onRangeInput() {
+      if (busy) { syncRangeValue(); return; }
       cancelAuto();
       var value = parseInt(ui.range.value, 10);
       if (answers[current] !== value) {
@@ -608,6 +650,7 @@
       if (reduced) {
         current = nextIndex;
         paintQuestion();
+        scrollCardIntoView();
         focusRange();
         return;
       }
@@ -621,6 +664,7 @@
           requestAnimationFrame(function () {
             ui.slide.className = 'quiz-slide';
             busy = false;
+            scrollCardIntoView();
             focusRange();
           });
         });
@@ -652,16 +696,45 @@
     /* --- состояния блока --- */
 
     function showStage(name) {
+      /* Шапка: на приглашении — внутри карточки, дальше — над ней. */
+      if (name === 'intro') {
+        if (ui.head.parentNode !== ui.intro) {
+          ui.intro.insertBefore(ui.head, ui.intro.firstChild);
+        }
+      } else if (ui.head.parentNode !== ui.inner) {
+        ui.inner.insertBefore(ui.head, ui.card);
+      }
       ui.intro.hidden = (name !== 'intro');
       ui.question.hidden = (name !== 'question');
       ui.result.hidden = (name !== 'result');
       ui.card.setAttribute('data-state', name);
+      ui.section.setAttribute('data-state', name);
+    }
+
+    /* Во встроенном браузере Telegram (390×668) якорный скролл ставит в кадр
+       верх секции, и на карточку остаётся меньше половины экрана: ползунок и
+       кнопки уходят под кромку. Поэтому подводим к кадру саму карточку. */
+    function scrollCardIntoView() {
+      try {
+        var view = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
+        var box = ui.card.getBoundingClientRect();
+        /* Карточка уже целиком в кадре — не дёргаем страницу. */
+        if (view && box.top >= 0 && box.bottom <= view) { return; }
+        ui.card.scrollIntoView({
+          /* Карточка выше экрана — прижимаем верхом, иначе ставим по центру. */
+          block: (box.height && view && box.height + 32 > view) ? 'start' : 'center',
+          behavior: reduced ? 'auto' : 'smooth'
+        });
+      } catch (e) {
+        try { ui.card.scrollIntoView(); } catch (e2) { /* совсем старый движок */ }
+      }
     }
 
     function start() {
       current = 0;
       showStage('question');
       paintQuestion();
+      scrollCardIntoView();
       focusRange();
     }
 
@@ -672,17 +745,34 @@
         sum += answers[i];
       }
       writeStored(answers.slice(), sum);
-      showResult(sum, !reduced);
+      showResult(sum, !reduced, true);
     }
 
-    function showResult(sum, animate) {
+    /* fresh === true — человек только что нажал «Показать результат»:
+       переводим фокус на результат и подводим карточку к кадру.
+       При восстановлении из localStorage на загрузке страницы ни фокус,
+       ни прокрутку не трогаем. */
+    function showResult(sum, animate, fresh) {
       var index = indexFor(sum);
+      var verdictText = resultTextFor(sum);
       showStage('result');
       paintDots(ui.progressDots, TOTAL);
       ui.sumLine.textContent = 'сумма ответов: ' + sum + ' из ' + MAX_SUM;
-      ui.verdict.textContent = resultTextFor(sum);
+      ui.verdict.textContent = verdictText;
+      /* Одной строкой для скринридера: индекс, сумма, результат и дисклеймер. */
+      ui.announce.textContent = 'Индекс ' + index + ' из 100. ' +
+        'Сумма ответов: ' + sum + ' из ' + MAX_SUM + '. ' +
+        verdictText + ' ' + DISCLAIMER;
       paintRing(ui.ringArc, index, 100, animate);
       countUp(ui.ringNumber, index, animate);
+      if (fresh) {
+        scrollCardIntoView();
+        try {
+          ui.result.focus({ preventScroll: true });
+        } catch (e) {
+          try { ui.result.focus(); } catch (e2) { /* фокус не критичен */ }
+        }
+      }
       if (animate) {
         /* Текст результата проявляется через 200 мс после того, как цифра досчитала. */
         ui.verdict.classList.add('is-hidden');
@@ -704,9 +794,9 @@
       for (var i = 0; i < TOTAL; i++) { answers[i] = null; }
       current = 0;
       ui.slide.className = 'quiz-slide';
-      paintDots(ui.progressDots, 0);
       paintQuestion();
       showStage('question');
+      scrollCardIntoView();
       focusRange();
     }
 
@@ -732,11 +822,14 @@
       if (keys.indexOf(event.key) !== -1) { markTouched(); }
     });
 
-    /* Автопереход — через 450 мс после того, как ползунок отпустили. */
+    /* Автопереход — только через 450 мс после того, как ОТПУСТИЛИ ползунок
+       (§B2). На клавиатуру его не вешаем: там шаг делается кнопкой «Дальше»,
+       как и написано в дизайне. Иначе пауза дольше 450 мс между нажатиями
+       стрелки уводила карточку на следующий вопрос с недобранным ответом.
+       'change' избыточен: после тапа и перетаскивания всё равно
+       приходит 'pointerup'. */
     ui.range.addEventListener('pointerup', scheduleAuto);
     ui.range.addEventListener('touchend', scheduleAuto);
-    ui.range.addEventListener('keyup', scheduleAuto);
-    ui.range.addEventListener('change', scheduleAuto);
     ui.range.addEventListener('blur', cancelAuto);
 
     /* --- старт --- */
@@ -745,7 +838,8 @@
     if (stored) {
       for (var j = 0; j < TOTAL; j++) { answers[j] = stored.answers[j]; }
       current = TOTAL - 1;
-      showResult(stored.sum, false); /* результат моложе 30 дней — сразу, без анимации */
+      /* Результат моложе 30 дней — сразу, без анимации, без фокуса и прокрутки */
+      showResult(stored.sum, false, false);
     } else {
       showStage('intro');
     }

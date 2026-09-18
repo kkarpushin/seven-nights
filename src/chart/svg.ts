@@ -230,7 +230,8 @@ export function buildChartSvg(points: readonly ChartPoint[], o: ChartOpts): stri
       `<text x="600" y="${SUMMARY_Y}" text-anchor="middle" font-size="92" font-weight="bold" ` +
         `fill="${COLORS.title}">${esc(summary.left)}</text>`,
     )
-  } else if (summary !== null) {
+  } else if (summary !== null && summary.right !== null) {
+    const right = summary.right
     const gap = 66
     s.push(
       `<text x="${600 - gap}" y="${SUMMARY_Y}" text-anchor="end" font-size="92" font-weight="bold" ` +
@@ -240,7 +241,7 @@ export function buildChartSvg(points: readonly ChartPoint[], o: ChartOpts): stri
     s.push(...arrowSvg(600, SUMMARY_Y - 30, COLORS.after))
     s.push(
       `<text x="${600 + gap}" y="${SUMMARY_Y}" text-anchor="start" font-size="92" font-weight="bold" ` +
-        `fill="${COLORS.title}">${esc(summary.right)}</text>`,
+        `fill="${COLORS.title}">${esc(right)}</text>`,
     )
   }
   const bot = o.botName.startsWith('@') ? o.botName : `@${o.botName}`

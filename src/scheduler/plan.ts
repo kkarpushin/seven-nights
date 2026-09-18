@@ -108,7 +108,11 @@ export function recompute(ctx: Ctx, u: UserRow, now: number): Plan {
       if (!s) return planPing(t, u, now)
       return planAfterAsked(t, u, s, now)
 
+    // quiz_after — тот же завершивший программу человек, просто с открытым тестом.
+    // Если считать это состояние «без срока», то начатый и брошенный в полночь тест
+    // отменил бы утреннее сообщение дня восьмого навсегда.
     case 'completed':
+    case 'quiz_after':
       return u.day8_sent === 1 ? NO_DUE : planDay8(t, u, now)
 
     case 'new':
@@ -116,7 +120,6 @@ export function recompute(ctx: Ctx, u: UserRow, now: number): Plan {
     case 'onb_clock':
     case 'change_hour':
     case 'change_clock':
-    case 'quiz_after':
     case 'paused':
     case 'blocked':
       return NO_DUE

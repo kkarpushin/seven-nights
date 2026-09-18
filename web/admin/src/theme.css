@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/*
+ * Токены те же, что на лендинге: админка и продукт должны выглядеть одним целым.
+ * Одна тема — тёмная. Светлой нет сознательно: одна тема это вдвое меньше мест,
+ * где контраст может разъехаться (§2.1 design-admin).
+ */
+@theme {
+  --color-page: #0F1233;
+  --color-surface: #161A3D;
+  --color-raised: #1E2350;
+  --color-ink: #F3EEE3;
+  --color-ink2: #A9ACC8;
+  --color-ink3: #8C91B8;
+  --color-line: rgba(255, 255, 255, 0.10);
+  --color-grid: #2A2F5C;
+  --color-axis: #3A4070;
+  --color-accent: #F2B56B;
+  --color-on-accent: #0F1233;
+
+  /* Цвета данных — отдельный набор, проверенный по контрасту и дальтонизму (§2.2). */
+  --color-s1: #6B75D2;
+  --color-s2: #C4862F;
+  --color-s3: #1C9C9C;
+
+  /* Состояния: всегда «точка + слово», цвет один не значит ничего (§2.3). */
+  --color-st-run: #3FBF6A;
+  --color-st-pause: #8C91B8;
+  --color-st-done: #F2B56B;
+  --color-st-silent: #FAB219;
+  --color-st-blocked: #E0645F;
+
+  --font-sans: "Golos Text", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Prata", Georgia, serif;
+
+  --radius-card: 16px;
+  --radius-field: 12px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Цифры в колонках должны стоять столбиком, иначе таблицу невозможно читать. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Фокус виден всегда — по клавиатуре админкой тоже пользуются. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::placeholder { color: var(--color-ink3); }
+
+.skeleton {
+  background: var(--color-raised);
+  border-radius: 10px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+/* Тултип Recharts перекрашиваем целиком: его белый фон здесь выглядит как ошибка. */
+.recharts-tooltip-wrapper:focus { outline: none; }
+.recharts-surface { overflow: visible; }

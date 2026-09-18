@@ -235,6 +235,9 @@
   var HERO_BEFORE = [4, 4, 5, 5, 5, 6, 6];
   var HERO_AFTER = [5, 6, 6, 7, 7, 7, 7];
 
+  // Описание графика для скринридера. Ставится на слот после отрисовки.
+  var HERO_ARIA_LABEL = 'График семи вечеров: линия «до» и линия «после». Пример.';
+
   var SCALE_MIN = 0;
   var SCALE_MAX = 10;
 
@@ -348,10 +351,14 @@
       axis.appendChild(el('circle', {
         cx: g.padLeft - 6, cy: round(y), r: 1.6, fill: p.mist, 'fill-opacity': '0.5'
       }));
+      /* Цифры оси набираем Golos, а не Prata: в Prata единица читается как
+         строчная «l», и верхняя граница шкалы выглядит как «l0». Prata
+         остаётся на крупной строке «Было 4. Стало 7.» (§2.3). */
       var t = el('text', {
         x: g.padLeft - 12, y: round(y + g.axisFont * 0.35),
         'text-anchor': 'end', fill: p.mist, 'font-size': g.axisFont,
-        'font-family': p.fontDisplay
+        'font-family': p.fontBody, 'font-weight': '500',
+        'font-variant-numeric': 'tabular-nums'
       });
       t.textContent = String(v);
       axis.appendChild(t);
@@ -462,6 +469,12 @@
 
     node.textContent = '';
     node.appendChild(svg);
+
+    /* Описание картинки ставим только теперь, когда картинка есть. Если модуль
+       не выполнился, на слоте не должно быть role="img": скринридеру нечего
+       описывать, а человек без JS видит пустое место, а не «график». */
+    node.setAttribute('role', 'img');
+    node.setAttribute('aria-label', HERO_ARIA_LABEL);
 
     /* --- анимация --- */
     var BEFORE_DELAY = 300;

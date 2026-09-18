@@ -21,7 +21,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Ctx } from '../ctx.ts'
 import { PROJECT_ROOT } from '../env.ts'
@@ -51,6 +51,13 @@ export type SyncOptions = {
   projectRoot?: string
   now: number
   log?: Logger
+}
+
+/** Одна практика считается ровно один раз: создана, обновлена или пропущена. */
+function tally(report: SyncReport, created: boolean, touched: boolean): void {
+  if (created) report.added++
+  else if (touched) report.updated++
+  else report.skipped++
 }
 
 function emptyReport(): SyncReport {
@@ -97,6 +104,7 @@ export function syncPractices(repo: PracticesRepo, o: SyncOptions): SyncReport {
       continue
     }
 
+    let created = false
     let touched = false
     if (existing === undefined) {
       repo.upsertFromFile({
@@ -109,8 +117,7 @@ export function syncPractices(repo: PracticesRepo, o: SyncOptions): SyncReport {
         now: o.now,
         sortOrder: sortOrderFor(p, parsed),
       })
-      report.added++
-      touched = true
+      created = true
     } else if (existing.script_hash !== p.scriptHash) {
       repo.upsertFromFile({
         slug: p.slug,
@@ -136,8 +143,7 @@ export function syncPractices(repo: PracticesRepo, o: SyncOptions): SyncReport {
       // в базе при этом рабочий. Обнулять аудио здесь значило бы сломать отправку
       // там, где она работает. Просто сообщаем.
       report.missingAudio.push(p.slug)
-      if (touched) report.updated++
-      else report.skipped++
+      tally(report, created, touched)
       continue
     }
 
@@ -148,19 +154,17 @@ export function syncPractices(repo: PracticesRepo, o: SyncOptions): SyncReport {
     const same =
       row.audio_sha256 === sha256 &&
       row.audio_path === rel &&
-      row.audio_bytes === statSync(audioPath).size &&
+      row.audio_bytes === bytes.length &&
       row.duration_sec === durationSec
 
     if (!same) {
       // setAudio сам сбросит tg_file_id при смене sha256 — Telegram по старому
       // идентификатору продолжал бы отдавать прежнюю запись.
-      repo.setAudio(row.id, { path: rel, sha256, bytes: statSync(audioPath).size, durationSec })
+      repo.setAudio(row.id, { path: rel, sha256, bytes: bytes.length, durationSec })
       touched = true
     }
     report.withAudio++
-
-    if (touched) report.updated++
-    else report.skipped++
+    tally(report, created, touched)
   }
 
   const onDisk = new Set(parsed.map((p) => p.slug))

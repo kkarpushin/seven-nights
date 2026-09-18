@@ -11,9 +11,14 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Семь ночей, чтобы выдохнуть">
 <meta property="og:description" content="Каждый вечер в Telegram приходит одна практика. Ложишься, надеваешь наушники, слушаешь. До и после отвечаешь одной цифрой, как ты. Через неделю видишь свой график: с чего всё началось и где ты сейчас.">
-<meta property="og:image" content="og-card.png">
+<!-- og:image и og:url — только абсолютными URL: краулеры превью (Telegram,
+     Instagram, VK, WhatsApp) относительные пути не разрешают.
+     [[https://домен]] заменить на боевой адрес перед запуском. -->
+<meta property="og:url" content="[[https://домен]]/">
+<meta property="og:image" content="[[https://домен]]/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Семь вечеров, линия «до» и линия «после». Было 4. Стало 7.">
 <meta property="og:locale" content="ru_RU">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -66,8 +71,10 @@
       </div>
 
       <figure class="hero__figure reveal">
-        <!-- Слот сигнатурного графика: содержимое рисует chart.js -->
-        <div id="hero-chart" class="hero-chart" role="img" aria-label="График семи вечеров: линия «до» и линия «после». Пример."></div>
+        <!-- Слот сигнатурного графика: содержимое рисует chart.js.
+             role="img" и aria-label ставит chart.js ПОСЛЕ успешной отрисовки:
+             пока графика нет (скрипт не выполнился), скринридеру нечего описывать. -->
+        <div id="hero-chart" class="hero-chart"></div>
         <figcaption class="caption hero__caption">Так выглядит график на седьмой вечер. Пример.</figcaption>
         <p class="bigline">Было 4. Стало 7.</p>
       </figure>
@@ -92,8 +99,22 @@
 
   <div class="divider" aria-hidden="true"><div class="dots" data-dots="7" data-filled="0"></div></div>
 
-  <!-- 1.25 Тест. Секция намеренно пустая: всю разметку внутри строит quiz.js -->
-  <section id="quiz" class="quiz-section" aria-labelledby="quiz-title"></section>
+  <!-- 1.25 Тест. Всю разметку внутри строит quiz.js.
+       <noscript> — единственное содержимое в разметке: если скрипт не выполнился
+       (старый WebView внутри Telegram или Instagram, заблокированный файл),
+       секция не пустая, у неё есть настоящий заголовок #quiz-title,
+       и человек из главной кнопки первого экрана попадает не в пустоту.
+       При живом JS содержимое <noscript> в DOM не попадает — конфликта id нет. -->
+  <section id="quiz" class="quiz-section" aria-labelledby="quiz-title" data-state="intro">
+    <noscript>
+      <div class="quiz-inner">
+        <h2 class="quiz-title" id="quiz-title">Где сейчас твоя опора</h2>
+        <p class="quiz-lead">Отвечай не «как правильно», а как было у тебя последние две-четыре недели.</p>
+        <p class="quiz-note">Семь вопросов с ползунками работают при включённом JavaScript. Сейчас он выключен, поэтому начать можно сразу в Telegram.</p>
+        <p><a class="btn btn--primary" href="https://t.me/ensoma_robot">Открыть в Telegram</a></p>
+      </div>
+    </noscript>
+  </section>
 
   <!-- 1.3 Как это работает -->
   <section class="section" aria-labelledby="evening-title">
@@ -126,9 +147,22 @@
           <p class="audio-msg__text">[[Две строки к практике первого вечера — заменим текстом специалиста]]</p>
         </div>
 
-        <div class="audio-sample reveal" style="--reveal-delay:240ms">
-          <p class="audio-sample__label">Послушать 30 секунд</p>
-          <audio class="audio-sample__player" controls preload="none" aria-label="Послушать 30 секунд, фрагмент первой практики">
+        <!-- Свой плеер (§2.6): нативные controls на ночном фоне выглядят
+             вставкой из чужой операционной системы.
+             Блок скрыт, пока файл фрагмента не подтвердил, что он есть:
+             скрипт внизу страницы снимает hidden по loadedmetadata и
+             оставляет блок скрытым при ошибке загрузки. -->
+        <div class="audio-sample reveal js-audio-sample" style="--reveal-delay:240ms" hidden>
+          <button class="player js-audio-btn" type="button" aria-pressed="false">
+            <span class="player__icon" aria-hidden="true">
+              <svg class="player__glyph player__glyph--play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5 3.2v9.6c0 .5.55.8.97.53l7.3-4.8a.63.63 0 0 0 0-1.06l-7.3-4.8A.63.63 0 0 0 5 3.2Z"/></svg>
+              <svg class="player__glyph player__glyph--pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4.4 2.6h2.4c.33 0 .6.27.6.6v9.6c0 .33-.27.6-.6.6H4.4a.6.6 0 0 1-.6-.6V3.2c0-.33.27-.6.6-.6Zm4.8 0h2.4c.33 0 .6.27.6.6v9.6c0 .33-.27.6-.6.6H9.2a.6.6 0 0 1-.6-.6V3.2c0-.33.27-.6.6-.6Z"/></svg>
+            </span>
+            <span class="player__label">Послушать 30 секунд</span>
+            <span class="player__time js-audio-time">0:30</span>
+          </button>
+          <div class="player__track" aria-hidden="true"><span class="player__bar js-audio-bar"></span></div>
+          <audio class="js-audio" preload="metadata">
             <source src="audio/practice-1-fragment.mp3" type="audio/mpeg">
           </audio>
           <p class="caption">Голос [[Анны]]. Фрагмент первой практики.</p>
@@ -315,7 +349,10 @@
 <!-- 1.11 Футер -->
 <footer class="site-foot">
   <div class="wrap col">
-    <p class="foot__text">«Семь ночей» — программа аудиопрактик. Не является медицинской помощью, диагностикой или лечением и не заменяет консультацию врача или психотерапевта. Если тебе плохо прямо сейчас, обратись за помощью к специалисту или в службу экстренной помощи.</p>
+    <!-- Первый абзац футера — единственное место, где страница говорит человеку
+         в остром состоянии, куда идти. Поэтому он крупнее остальных строк,
+         а фраза про экстренную помощь вынесена отдельной строкой цветом moon. -->
+    <p class="foot__text foot__text--care">«Семь ночей» — программа аудиопрактик. Не является медицинской помощью, диагностикой или лечением и не заменяет консультацию врача или психотерапевта. <span class="foot__urgent">Если тебе плохо прямо сейчас, обратись за помощью к специалисту или в службу экстренной помощи.</span></p>
     <p class="foot__text">Практики слушают лёжа или сидя в спокойном месте. Не слушай за рулём, при управлении техникой и в ситуациях, где нужно внимание.</p>
     <p class="foot__text">Бот в Telegram: <a class="link link--quiet js-bot-link" href="https://t.me/ensoma_robot">@ensoma_robot</a> · <a class="link link--quiet" href="[[ссылка]]">Канал [[Анны]]</a> · <a class="link link--quiet" href="[[ссылка на страницу разговора]]">[[Разговор, 30 минут]]</a> · <a class="link link--quiet" href="[[Написать: ссылка на личный Telegram]]">[[Написать: ссылка на личный Telegram]]</a></p>
     <p class="foot__copy">© 2026 [[Анна Фамилия]]</p>
@@ -373,6 +410,63 @@
     }, { threshold: 0 }).observe(finalBlock);
   }
 })();
+
+/* Плеер фрагмента практики (§2.6): своя кнопка play/pause и тонкая линия
+   прогресса. Нативные controls не используем — на ночном фоне это чужая
+   светло-серая панель. Блок показываем ТОЛЬКО если файл реально отдался:
+   пока фрагмента нет, обещание «послушать» лучше не показывать вовсе. */
+(function () {
+  var box = document.querySelector('.js-audio-sample');
+  if (!box) return;
+  var audio = box.querySelector('.js-audio');
+  var btn = box.querySelector('.js-audio-btn');
+  var bar = box.querySelector('.js-audio-bar');
+  var time = box.querySelector('.js-audio-time');
+  if (!audio || !btn || !bar || !time) return;
+
+  function mmss(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var s = Math.round(sec);
+    return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+  }
+
+  audio.addEventListener('loadedmetadata', function () {
+    time.textContent = mmss(audio.duration);
+    box.removeAttribute('hidden'); // файл есть — блок можно показывать
+  });
+
+  /* Файла нет или формат не поддержан: блок остаётся скрытым, ничего не мигает. */
+  audio.addEventListener('error', function () { box.setAttribute('hidden', ''); });
+  var src = audio.querySelector('source');
+  if (src) src.addEventListener('error', function () { box.setAttribute('hidden', ''); });
+
+  btn.addEventListener('click', function () {
+    if (audio.paused) {
+      var p = audio.play();
+      if (p && typeof p.catch === 'function') { p.catch(function () { /* без звука — молча */ }); }
+    } else {
+      audio.pause();
+    }
+  });
+
+  audio.addEventListener('play', function () {
+    box.classList.add('is-playing');
+    btn.setAttribute('aria-pressed', 'true');
+  });
+  audio.addEventListener('pause', function () {
+    box.classList.remove('is-playing');
+    btn.setAttribute('aria-pressed', 'false');
+  });
+  audio.addEventListener('timeupdate', function () {
+    var d = audio.duration;
+    bar.style.width = (d > 0 ? Math.min(100, audio.currentTime / d * 100) : 0) + '%';
+    time.textContent = mmss(d > 0 ? d - audio.currentTime : 0);
+  });
+  audio.addEventListener('ended', function () {
+    bar.style.width = '0%';
+    time.textContent = mmss(audio.duration);
+  });
+})();
 </script>
 
 <!--
@@ -389,9 +483,13 @@
   [[Написать: ссылка на личный Telegram]]  — личный Telegram специалиста, футер
   [[Две строки к практике первого вечера — заменим текстом специалиста]]  — блок 1.3, шаг 2
   [[X ₽]], [[Продамус]], [[ссылка на оплату]]  — в закомментированном блоке цены и вопросе FAQ
+  [[https://домен]]       — боевой адрес страницы: og:url и og:image в <head>.
+                            Без абсолютного URL превью ссылки в Telegram не соберётся.
 
-  ФАЙЛЫ-ЗАГЛУШКИ, которых пока нет рядом с index.html:
-  audio/practice-1-fragment.mp3  — фрагмент 30 секунд, MP3, около 500 КБ
+  ФАЙЛЫ рядом с index.html:
+  audio/practice-1-fragment.mp3  — фрагмент 30 секунд, MP3, около 500 КБ. ПОКА НЕТ.
+                                   Блок «Послушать 30 секунд» скрыт, пока файла нет,
+                                   и появится сам, как только файл ляжет на место.
   img/author.jpg                 — портрет 480×480
   og-card.png                    — карточка 1200×630 (она же og:image, она же картинка бота)
 

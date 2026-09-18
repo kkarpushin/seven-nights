@@ -81,11 +81,15 @@ body {
   color: var(--moon);
   background-color: var(--night);
   /* §2.2 — фон как время суток: одно небо от 22:00 до полоски рассвета внизу */
+  /* Светлая точка неба (85%) намеренно ТЕМНЕЕ, чем --dusk (#1A1E4A):
+     из dusk сделаны пузыри бота, карточки и карточка памяти. Если фон
+     догоняет цвет поверхностей, в нижней половине страницы пузыри
+     растворяются, и «это переписка» перестаёт читаться. */
   background-image: linear-gradient(
     180deg,
     #0B0E2A 0%,
     var(--night) 30%,
-    #1C1F4C 85%,
+    #15193C 85%,
     #3A2F55 94%,
     #5A4463 100%
   );
@@ -100,10 +104,12 @@ img { max-width: 100%; height: auto; display: block; }
 
 a { color: inherit; }
 
+/* Радиус обводке не задаём: браузер и так повторяет собственный радиус
+   элемента, а жёсткие 4px превращали скруглённую кнопку в прямоугольную
+   ровно в момент, когда до неё доходят табом. */
 :focus-visible {
   outline: 2px solid var(--moon);
   outline-offset: 3px;
-  border-radius: 4px;
 }
 
 /* --------------------------------------------------------------------------
@@ -293,14 +299,22 @@ a { color: inherit; }
    Hero
    -------------------------------------------------------------------------- */
 
-.hero { position: relative; }
+/* overflow: hidden обязателен. Декор внутри hero не должен расширять документ:
+   пятно, выходившее за правый край, делало initial containing block на 60px
+   шире вьюпорта, и position: fixed (липкая мобильная кнопка) резолвился по
+   этой лишней ширине — кнопка уезжала за нижнюю кромку экрана. */
+.hero {
+  position: relative;
+  overflow: hidden;
+}
 
-/* Лампа: единственное декоративное пятно на странице (§2.2) */
+/* Лампа: единственное декоративное пятно на странице (§2.2).
+   Держим её целиком внутри секции: и документ не растёт, и обрезки не видно. */
 .hero::before {
   content: "";
   position: absolute;
-  top: -80px;
-  right: -60px;
+  top: 0;
+  right: 0;
   width: min(420px, 78vw);
   aspect-ratio: 1;
   background: radial-gradient(circle, rgba(var(--lamp-rgb), .10), rgba(var(--lamp-rgb), 0) 68%);
@@ -428,9 +442,12 @@ a { color: inherit; }
   border-radius: var(--r-card);
 }
 
+/* Волосяная обводка: страховка на случай, если фон под пузырём окажется
+   близко к --dusk. Пузырь должен читаться как поверхность на любой высоте. */
 .bubble--bot {
   background: var(--dusk);
   color: var(--moon);
+  border: 1px solid rgba(var(--moon-rgb), .08);
   border-bottom-left-radius: 6px;
 }
 
@@ -517,18 +534,71 @@ a { color: inherit; }
   background: rgba(var(--dusk-rgb), .45);
 }
 
-.audio-sample__label {
+/* Блок скрыт, пока скрипт не убедился, что фрагмент реально отдаётся */
+.audio-sample[hidden] { display: none; }
+
+/* Свой плеер (§2.6): кнопка с иконкой play/pause и тонкая линия прогресса */
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--moon);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player__icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lamp);
+  color: var(--night);
+  transition: transform 160ms ease;
+}
+.player:hover .player__icon { transform: translateY(-1px); }
+
+.player__glyph { display: none; }
+.player__glyph--play { display: block; }
+.is-playing .player__glyph--play { display: none; }
+.is-playing .player__glyph--pause { display: block; }
+
+.player__label {
+  flex: 1 1 auto;
   font-size: var(--fs-small);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--moon);
-  margin-bottom: 10px;
 }
 
-.audio-sample__player {
-  width: 100%;
-  height: 40px;
-  margin-bottom: 10px;
+.player__time {
+  flex: none;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--mist);
+}
+
+.player__track {
+  height: 2px;
+  margin: 12px 0 10px;
+  border-radius: 1px;
+  background: rgba(var(--before-rgb), .3);
+}
+
+.player__bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--lamp);
 }
 
 .chat__caption { margin-top: 24px; }
@@ -551,7 +621,16 @@ a { color: inherit; }
   box-shadow: var(--shadow-card);
 }
 
-.card__emoji { font-size: 26px; line-height: 1; margin-bottom: 12px; }
+/* Эмодзи рисуются системным цветным шрифтом и в ночной палитре из трёх цветов
+   становятся самыми яркими пикселями страницы. Приглушаем, чтобы взгляд шёл
+   к заголовкам карточек, а не к салатовой ветке. */
+.card__emoji {
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: 12px;
+  opacity: .7;
+  filter: saturate(.55);
+}
 
 .card__title {
   font-family: var(--font-body);
@@ -714,7 +793,28 @@ a { color: inherit; }
 .site-foot {
   position: relative;
   /* Снизу оставляем место под липкую кнопку, чтобы она не накрывала дисклеймеры */
-  padding: 32px 0 clamp(92px, 20vw, 120px);
+  padding: 40px 0 clamp(92px, 20vw, 120px);
+}
+
+/* Футер лежит на светлом конце градиента («полоска рассвета»), и mist на нём
+   давал 4.3–4.4:1 — ниже порога. Возвращаем под текст ночь: первые 24px
+   затемнение нарастает, чтобы не было шва на границе секции. */
+.site-foot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--night-rgb), 0) 0,
+    rgba(var(--night-rgb), .5) 24px,
+    rgba(var(--night-rgb), .5) 100%
+  );
+  pointer-events: none;
+}
+
+.site-foot > .wrap {
+  position: relative;
+  z-index: 1;
 }
 
 .foot__text {
@@ -724,10 +824,24 @@ a { color: inherit; }
 }
 .foot__text + .foot__text { margin-top: 12px; }
 
+/* Медицинский дисклеймер — самый важный текст футера, поэтому он крупнее
+   остальных строк и с более короткой строкой. */
+.foot__text--care {
+  max-width: 46em;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.foot__urgent {
+  display: block;
+  margin-top: 6px;
+  color: var(--moon);
+}
+
 .foot__copy {
   margin-top: 20px;
   font-size: var(--fs-small);
-  color: rgba(var(--mist-rgb), .7);
+  color: var(--mist);
 }
 
 /* --------------------------------------------------------------------------
@@ -757,19 +871,27 @@ a { color: inherit; }
   transform: translateY(140%);
   opacity: 0;
   pointer-events: none;
-  transition: transform 260ms ease, opacity 260ms ease;
+  /* visibility, а не только opacity: иначе полностью прозрачная кнопка
+     остаётся последней остановкой табуляции, и кольцо фокуса рисуется
+     на невидимом элементе за кромкой экрана. */
+  visibility: hidden;
+  transition: transform 260ms ease, opacity 260ms ease, visibility 0s linear 260ms;
 }
 
 .sticky-cta.is-stuck {
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
+  transition: transform 260ms ease, opacity 260ms ease, visibility 0s linear 0s;
 }
 
 .sticky-cta.is-hidden {
   transform: translateY(140%);
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
+  transition: transform 260ms ease, opacity 260ms ease, visibility 0s linear 260ms;
 }
 
 /* --------------------------------------------------------------------------

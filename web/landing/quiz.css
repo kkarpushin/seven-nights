@@ -45,18 +45,31 @@
   color: var(--mist);
 }
 
+/* В состоянии «результат» шапка перестаёт объяснять, как отвечать:
+   человек уже ответил, и «результат покажем здесь же» ему больше не новость. */
+.quiz-section[data-state="result"] .quiz-lead,
+.quiz-section[data-state="result"] .quiz-note {
+  display: none;
+}
+
+/* Когда шапка переезжает внутрь карточки-приглашения, её отступы
+   подстраиваются под центрированную раскладку. */
+.quiz-intro .quiz-head { margin-bottom: 4px; }
+.quiz-intro .quiz-note { margin-bottom: 0; }
+
 /* --- карточка ------------------------------------------------------------- */
 
-/* Высота карточки фиксирована: при смене вопроса и при переходе
-   «приглашение → вопрос → результат» страница не должна прыгать. */
+/* Высоту держат сами состояния «вопрос» и «результат» (см. ниже), а не карточка:
+   на приглашении внутри одна кнопка и семь точек, и фиксированные 520px
+   превращали приглашение в пустой ящик. */
 .quiz-card {
   position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 520px;
   padding: 24px 20px 20px;
+  border: 1px solid rgba(var(--moon-rgb), .08);
   border-radius: 20px;
   background: var(--dusk);
   overflow: hidden;
@@ -70,6 +83,16 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Высота карточки вопроса постоянна, чтобы при смене вопроса ничего не прыгало,
+   но она же ограничена высотой экрана: во встроенном браузере Telegram
+   (390×668) при жёстких 520px ползунок и кнопки уходили под кромку.
+   Первое объявление — запасное для движков без svh. */
+.quiz-question,
+.quiz-result {
+  min-height: 460px;
+  min-height: min(460px, 74svh);
 }
 
 /* --- общие элементы управления -------------------------------------------- */
@@ -103,20 +126,33 @@
   transform: none;
 }
 
+/* Неактивная кнопка должна выглядеть неактивной, а не приглушённой основной:
+   opacity: 0.4 гасила и фон, и надпись, давая мутно-коричневую плашку
+   с нечитаемым текстом, по виду вполне нажимаемую. */
 .quiz-btn[disabled] {
-  opacity: 0.4;
+  opacity: 1;
+  background: transparent;
+  border: 1px solid rgba(var(--moon-rgb), .18);
+  color: var(--mist);
+  box-shadow: none;
   cursor: default;
   transform: none;
 }
 
+.quiz-btn[disabled]:hover {
+  transform: none;
+}
+
+/* «назад» — вторичное действие, оно не должно спорить с основным */
 .quiz-btn-ghost {
   min-height: 48px;
   padding: 0 14px;
   border-radius: 12px;
   background: transparent;
-  color: var(--moon);
+  color: var(--mist);
   font-weight: 500;
 }
+.quiz-btn-ghost:hover { color: var(--moon); }
 
 .quiz-link {
   display: inline-block;
@@ -133,10 +169,25 @@
   cursor: pointer;
 }
 
+/* Радиус здесь не задаём: правило перебивало собственный радиус кнопки
+   (14px → 4px), и кнопка меняла форму в момент, когда до неё доходят табом. */
 .quiz-section :focus-visible {
   outline: 2px solid var(--moon);
   outline-offset: 3px;
-  border-radius: 4px;
+}
+
+/* Текст только для скринридера: результат озвучивается одной строкой целиком */
+.quiz-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* --- состояние 1: приглашение --------------------------------------------- */
@@ -209,16 +260,21 @@
 }
 
 .quiz-question-text {
-  /* Высота блока вопроса фиксирована (пять строк), текст центрирован по вертикали:
-     вопросы разной длины не должны двигать ползунок и кнопки. */
+  /* Запас под пять строк, текст центрирован по вертикали: вопросы разной длины
+     не двигают ползунок и кнопки. Именно min-height, а не height: при жёсткой
+     высоте длинные вопросы (шестой и седьмой) вылезали из коробки и на 360px
+     наезжали на ряд точек прогресса.
+     Кегль привязан к ширине экрана, чтобы на 360px длинный вопрос
+     укладывался в те же пять строк. */
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 6.25em;
+  min-height: 6.25em;
   margin: 0 0 16px;
+  padding: 0 4px;
   font-family: var(--font-display, 'Prata', Georgia, serif);
   font-weight: 400;
-  font-size: 21px;
+  font-size: clamp(18px, 4.8vw, 22px);
   line-height: 1.25;
   color: var(--moon);
   text-align: center;
@@ -346,8 +402,10 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  /* Запас на три строки подписи: иначе подписи разной длины двигают кнопки. */
-  min-height: 56px;
+  /* Запас на три строки подписи: иначе подписи разной длины двигают кнопки.
+     56px на трёхстрочные подписи (вопросы 3 и 5) не хватало — карточка росла
+     на 8px, и кнопка «Дальше» прыгала между вопросами. */
+  min-height: 72px;
   margin-bottom: 8px;
 }
 
@@ -472,6 +530,18 @@
    Само оформление .sticky-cta и .sticky-cta.is-hidden живёт в styles.css,
    здесь его намеренно не дублируем, чтобы правила не спорили. */
 
+/* --- узкий телефон (360px и уже) ------------------------------------------- */
+
+@media (max-width: 380px) {
+  .quiz-card {
+    padding: 20px 16px 16px;
+  }
+
+  .quiz-inner {
+    padding: 0 16px;
+  }
+}
+
 /* --- десктоп ---------------------------------------------------------------- */
 
 @media (min-width: 1024px) {
@@ -488,13 +558,18 @@
   }
 
   .quiz-card {
-    min-height: 560px;
     padding: 32px 40px 28px;
+  }
+
+  .quiz-question,
+  .quiz-result {
+    min-height: 500px;
+    min-height: min(500px, 74svh);
   }
 
   .quiz-question-text {
     font-size: 26px;
-    height: 5em;
+    min-height: 5em;
   }
 
   .quiz-legend span {
