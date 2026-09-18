@@ -26,7 +26,7 @@ function walk(dir: string): string[] {
 }
 
 const files = walk(SRC).filter((f) => !f.includes('/demo/') && !f.endsWith('defaultTexts.ts'))
-const defined = new Set(DEFAULT_TEXTS.map((t: { key: string }) => t.key))
+const defined = new Set(DEFAULT_TEXTS.map((t) => t.key))
 
 /**
  * Обращения вида t('ev.close'), texts.get('onb.welcome'), render('num.range', …).
@@ -59,7 +59,7 @@ describe('ключи текстов', () => {
   it('ключи уникальны', () => {
     const seen = new Set<string>()
     const dupes: string[] = []
-    for (const t of DEFAULT_TEXTS as { key: string }[]) {
+    for (const t of DEFAULT_TEXTS) {
       if (seen.has(t.key)) dupes.push(t.key)
       seen.add(t.key)
     }
@@ -67,15 +67,13 @@ describe('ключи текстов', () => {
   })
 
   it('у каждого текста непустое значение', () => {
-    const empty = (DEFAULT_TEXTS as { key: string; value: string }[])
-      .filter((t) => !t.value || !t.value.trim())
-      .map((t) => t.key)
+    const empty = DEFAULT_TEXTS.filter((t) => !t.value || !t.value.trim()).map((t) => t.key)
     expect(empty).toEqual([])
   })
 
   it('плейсхолдеры в значении объявлены в поле placeholders', () => {
     const problems: string[] = []
-    for (const t of DEFAULT_TEXTS as { key: string; value: string; placeholders: string[] }[]) {
+    for (const t of DEFAULT_TEXTS) {
       const inValue = [...t.value.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
       for (const p of inValue) {
         if (!t.placeholders.includes(p)) problems.push(`${t.key}: {${p}} не объявлен`)
