@@ -700,7 +700,10 @@ if (!env.SEVEN_NIGHTS_NO_POLL) {
 
   const me = await bot.api.getMe()
   console.log(`«Семь ночей» запущен: @${me.username}, практик ${practices.length}, демо-режим ${DEMO_DEFAULT ? 'включён' : 'выключен'}`)
-  bot.start({ drop_pending_updates: true })
+  // Накопившиеся сообщения НЕ сбрасываем: человек мог ответить ровно в секунду
+  // перезапуска, и его цифра — единственное, чего бот от него ждёт. Потерять её
+  // значит молча оборвать ему вечер.
+  bot.start()
 
   const stop = () => { bot.stop(); db.close(); process.exit(0) }
   process.once('SIGINT', stop)
