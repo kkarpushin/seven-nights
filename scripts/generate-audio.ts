@@ -27,8 +27,8 @@ const MANIFEST = join(AUDIO_DIR, 'manifest.json')
 const FFMPEG = process.env.FFMPEG_BIN || 'ffmpeg'
 const FFPROBE = process.env.FFPROBE_BIN || 'ffprobe'
 
-const DEFAULT_VOICE = process.env.TTS_VOICE || 'ru-RU-Masha:MAI-Voice-2'
-const DEFAULT_STYLE = process.env.TTS_STYLE ?? 'caringempathy'
+const DEFAULT_VOICE = process.env.TTS_VOICE || 'ru-RU-SvetlanaNeural'
+const DEFAULT_STYLE = process.env.TTS_STYLE ?? ''
 
 type Args = { only?: string; force: boolean; dryRun: boolean; voice: string; style: string }
 
@@ -104,6 +104,29 @@ function silenceWav(path: string, seconds: number) {
 }
 
 /**
+ * Срезает тишину, которую синтез добавляет по краям каждого куска.
+ *
+ * Замерено: Azure оставляет 0,15–0,25 с в начале и 0,3–1,15 с в конце КАЖДОГО
+ * ответа. На практике из полусотни кусков это до полутора минут незапланированной
+ * тишины, и главное — паузы перестают соответствовать сценарию: автор написал
+ * «пять секунд», а звучит семь. Режем край и полагаемся только на свою тишину.
+ *
+ * Порог −50 dB и требование 0,08 с подобраны так, чтобы не откусывать тихие
+ * окончания слов и вдохи, которые в медитации несут смысл.
+ */
+function trimEdges(inWav: string, outWav: string) {
+  const trim = 'silenceremove=start_periods=1:start_duration=0.08:start_threshold=-50dB'
+  execFileSync(FFMPEG, [
+    '-v', 'error', '-y',
+    '-i', inWav,
+    // второй проход через areverse срезает хвост тем же фильтром
+    '-af', `${trim},areverse,${trim},areverse`,
+    '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '1',
+    outWav,
+  ])
+}
+
+/**
  * Склейка кусков и тишины + постобработка.
  *
  * Порядок фильтров важен: сначала тишина в начале (adelay), потом мягкий срез
@@ -147,7 +170,9 @@ async function renderPractice(p: Practice, v: VoiceParams, plan: Plan, outMp3: s
       } else {
         spoken++
         process.stdout.write(`   кусок ${spoken}/${total} (${req.chars} зн.)   \r`)
-        writeFileSync(path, await synthesize(req.parts, v))
+        const rawPath = `${path}.raw.wav`
+        writeFileSync(rawPath, await synthesize(req.parts, v))
+        trimEdges(rawPath, path)
       }
       parts.push(path)
     }

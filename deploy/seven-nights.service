@@ -1,0 +1,29 @@
+[Unit]
+Description=«Семь ночей» — Telegram-бот, планировщик, админка и лендинг
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/karpushin/7days
+ExecStart=/usr/bin/node /home/karpushin/7days/node_modules/.bin/tsx /home/karpushin/7days/src/index.ts
+EnvironmentFile=/home/karpushin/7days/.env
+Environment=NODE_ENV=production
+Environment=FFMPEG_BIN=/home/karpushin/.local/bin/ffmpeg
+Environment=FFPROBE_BIN=/home/karpushin/.local/bin/ffprobe
+# Процесс называем явно: pgrep по "index.ts" находит половину машины, а по
+# process.title — только этот сервис. См. общий регламент в ~/.claude/CLAUDE.md.
+Environment=PROCESS_TITLE=seven-nights
+
+# always, а не on-failure: systemd считает смерть от SIGTERM штатной, и on-failure
+# такой процесс не поднимет. Чужой pkill по шаблону уже ронял здесь прод однажды.
+Restart=always
+RestartSec=2
+
+# Бот — единственный владелец long polling: два экземпляра подряд получают
+# 409 Conflict от Telegram, поэтому перезапуск строго последовательный.
+KillMode=mixed
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

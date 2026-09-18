@@ -117,12 +117,15 @@
     }
   }
 
-  /* Лёгкая тактильная отдача на каждое целое деление. Есть не везде. */
+  /* Лёгкая тактильная отдача на каждое целое деление. Есть не везде.
+     Без состоявшегося касания браузер вызов всё равно блокирует и пишет
+     ругань в консоль, поэтому сначала спрашиваем про активацию. */
   function vibrate() {
     try {
-      if (navigator && typeof navigator.vibrate === 'function') {
-        navigator.vibrate(8);
-      }
+      if (!navigator || typeof navigator.vibrate !== 'function') { return; }
+      var act = navigator.userActivation;
+      if (act && act.hasBeenActive === false) { return; }
+      navigator.vibrate(8);
     } catch (e) { /* молча: вибрация — украшение, а не функция */ }
   }
 

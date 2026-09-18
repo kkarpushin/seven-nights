@@ -1,0 +1,62 @@
+{
+  "calm-ground": {
+    "slug": "calm-ground",
+    "title": "Пять вещей вокруг",
+    "category": "calm",
+    "intro": [
+      "Эта — с открытыми глазами, прямо там, где ты.",
+      "Пять минут, ничего закрывать и ложиться не нужно."
+    ],
+    "duration": 539,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "0563227b59e6262f",
+    "chars": 3309,
+    "generatedAt": "2026-09-18T08:00:14.254Z"
+  },
+  "calm-kind": {
+    "slug": "calm-kind",
+    "title": "Рука на сердце",
+    "category": "calm",
+    "intro": [
+      "Эта — на случай, когда ты сегодня себе не нравишься.",
+      "Ладонь на грудь, наушники и никуда не спешить."
+    ],
+    "duration": 599,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "913043f5cb454b85",
+    "chars": 2906,
+    "generatedAt": "2026-09-18T08:00:52.455Z"
+  },
+  "calm-sigh": {
+    "slug": "calm-sigh",
+    "title": "Два вдоха и выдох",
+    "category": "calm",
+    "intro": [
+      "Четыре минуты, можно сидя, хоть на работе.",
+      "Два вдоха носом, один длинный выдох ртом — я покажу."
+    ],
+    "duration": 546,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "59c43a70e730b8c6",
+    "chars": 2872,
+    "generatedAt": "2026-09-18T08:01:27.405Z"
+  },
+  "day-talk": {
+    "slug": "day-talk",
+    "title": "Перед разговором",
+    "category": "day",
+    "intro": [
+      "Перед разговором, который важен. Пять минут, сидя.",
+      "Глаза можно не закрывать."
+    ],
+    "duration": 530,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "bfbb976974781edf",
+    "chars": 2641,
+    "generatedAt": "2026-09-18T08:02:06.054Z"
+  }
+}
