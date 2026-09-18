@@ -21,13 +21,14 @@
  *    транзакция «msg_id, practice_sent_at, plays, событие».
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Ctx } from '../ctx.ts'
 import type { ButtonId } from '../ctx.ts'
 import type { Category, DueKind, SessionRow, UserRow, UserState } from '../db/types.ts'
 import { createKeyboards, type Keyboards } from '../keyboards.ts'
 import { parseStartPayload } from '../parse.ts'
-import { bar, dots } from '../texts.ts'
-import { fmtHm, fmtTz, whenWord } from '../time.ts'
+import { dots } from '../texts.ts'
+import { endOfRitualDay, fmtHm, fmtTz, RITUAL_DAY_START_HOUR, whenWord } from '../time.ts'
 import { timingsFor, type Timings } from '../timings.ts'
 import { BlockedError } from './send.ts'
 
@@ -92,22 +93,32 @@ export type Trigger =
 const locks = new Map<number, Promise<unknown>>()
 
 /**
+ * Чей лок держит текущая асинхронная цепочка. Нужен для повторного входа:
+ * планировщик берёт flow.withUserLock сам, а потом зовёт flow.handle, который
+ * попытался бы взять тот же лок изнутри — и встал бы навсегда, ожидая себя.
+ */
+const heldBy = new AsyncLocalStorage<number>()
+
+/**
  * Очередь на одного человека. Глобального лока нет намеренно: пятьдесят человек в
  * 21:00 должны получить пинг параллельно, а вот один человек, тапнувший дважды, —
  * строго по очереди.
  */
 export async function withUserLock<T>(userId: number, fn: () => Promise<T>): Promise<T> {
+  if (heldBy.getStore() === userId) return fn() // лок уже наш — заходим без очереди
+
   const prev = locks.get(userId) ?? Promise.resolve()
-  const next = prev.then(fn, fn)
-  locks.set(
-    userId,
-    next.catch(() => undefined),
-  )
+  const run = (): Promise<T> => heldBy.run(userId, fn)
+  // .then(run, run): предыдущая работа могла упасть, но очередь на этом не кончается.
+  const next = prev.then(run, run)
+  const tail = next.catch(() => undefined)
+  locks.set(userId, tail)
   try {
     return await next
   } finally {
-    // Хвост очереди убираем за собой, иначе Map растёт на каждого, кто когда-либо писал.
-    if (locks.get(userId) === next || locks.get(userId) === undefined) locks.delete(userId)
+    // Хвост убираем за собой, иначе Map растёт на каждого, кто когда-либо писал.
+    // Если сзади уже встали — в Map чужой хвост, и трогать его нельзя.
+    if (locks.get(userId) === tail) locks.delete(userId)
   }
 }
 
@@ -138,8 +149,7 @@ export function eveningLabel(u: UserRow): number {
 
 /** Значения плейсхолдеров, которые могут понадобиться почти любому тексту. */
 export function commonVars(ctx: Ctx, u: UserRow, now: number): Record<string, string | number> {
-  const t = timings(ctx, u)
-  const next = t.nextEvening(u, now)
+  const next = nextPingAt(ctx, u, now)
   return {
     n: eveningLabel(u),
     dots: dots(u.current_evening),
@@ -156,6 +166,24 @@ export function commonVars(ctx: Ctx, u: UserRow, now: number): Record<string, st
 
 export function setDue(ctx: Ctx, u: UserRow, state: UserState, at: number | null, kind: DueKind | null): void {
   ctx.repo.users.setState(u.id, state, { at, kind })
+}
+
+/**
+ * Когда прийти со следующим вечером. §3.4: «ближайшее {time} СЛЕДУЮЩЕЙ ритуальной даты».
+ *
+ * Разница с «ближайшим вечерним часом» видна там, где вечер прошёл раньше срока:
+ * человек нажал «Практика сейчас» в 20:20 и закрыл вечер до 21:00. Ближайшие 21:00
+ * — это ещё сегодня, то есть те же ритуальные сутки, на которые вечер уже засчитан.
+ * Инвариант «один вечер на дату» не даст его открыть, но пинг всё равно сработает
+ * вхолостую, а в тексте «Напишу завтра в 21:00» слово «завтра» окажется неправдой.
+ * Поэтому, если вечер на текущую дату уже засчитан, отсчёт ведём от конца её суток.
+ */
+export function nextPingAt(ctx: Ctx, u: UserRow, now: number): number {
+  const t = timings(ctx, u)
+  if (t.demo) return t.nextEvening(u, now)
+  const startHour = ctx.settings.int('ritual_day_start_hour', RITUAL_DAY_START_HOUR)
+  const counted = ctx.repo.sessions.countedOn(u.id, t.ritualDate(u, now))
+  return t.nextEvening(u, counted ? endOfRitualDay(u, now, startHour) : now)
 }
 
 /** Домашняя клавиатура для текущего состояния: «Продолжить» и «Ещё семь вечеров» — по месту. */
@@ -182,13 +210,13 @@ export function recomputeDue(ctx: Ctx, user: UserRow, now: number): void {
 
   switch (u.state) {
     case 'idle':
-      put(u.current_evening >= 7 ? null : t.nextEvening(u, now), u.current_evening >= 7 ? null : 'ping')
+      put(u.current_evening >= 7 ? null : nextPingAt(ctx, u, now), u.current_evening >= 7 ? null : 'ping')
       return
     case 'awaiting_before':
     case 'awaiting_state':
       if (!s) {
         // Состояние ждёт сессии, которой нет, — чинимся в пользу дома.
-        setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+        setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
         return
       }
       put(
@@ -204,7 +232,7 @@ export function recomputeDue(ctx: Ctx, user: UserRow, now: number): void {
       return
     case 'awaiting_after':
       if (!s) {
-        setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+        setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
         return
       }
       if (s.kind === 'now') {
@@ -218,7 +246,7 @@ export function recomputeDue(ctx: Ctx, user: UserRow, now: number): void {
           return
         }
       }
-      put(t.nextEvening(u, now), 'ping_or_close')
+      put(nextPingAt(ctx, u, now), 'ping_or_close')
       return
     case 'completed':
     case 'quiz_after':
@@ -295,7 +323,7 @@ export async function resume(ctx: Ctx, user: UserRow, now: number): Promise<void
     return
   }
 
-  setDue(ctx, after, 'idle', t.nextEvening(after, now), 'ping')
+  setDue(ctx, after, 'idle', nextPingAt(ctx, after, now), 'ping')
   const u2 = fresh(ctx, after)
   await ctx.send.text(u2, 'pause.off', commonVars(ctx, u2, now), kbs(ctx).homeKb())
 }
@@ -327,7 +355,7 @@ export async function restartProgram(ctx: Ctx, user: UserRow, now: number): Prom
 
   const after = fresh(ctx, u)
   const t = timings(ctx, after)
-  setDue(ctx, after, 'idle', t.nextEvening(after, now), 'ping')
+  setDue(ctx, after, 'idle', nextPingAt(ctx, after, now), 'ping')
 
   const u2 = fresh(ctx, after)
   await ctx.send.text(u2, 'restart.done', commonVars(ctx, u2, now), kbs(ctx).homeKb())
@@ -596,8 +624,7 @@ async function onButton(ctx: Ctx, u: UserRow, id: ButtonId, now: number): Promis
       // Строка 7 §3.2: первый вечер из онбординга переносится на вечерний час.
       if (s && u.state === 'awaiting_before') {
         ctx.repo.sessions.deleteSession(s.id)
-        const t = timings(ctx, u)
-        setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+        setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
         const u2 = fresh(ctx, u)
         await ctx.send.text(u2, 'onb.done_later', commonVars(ctx, u2, now), kbs(ctx).homeKb())
         return
@@ -608,8 +635,7 @@ async function onButton(ctx: Ctx, u: UserRow, id: ButtonId, now: number): Promis
       return pause(ctx, u, 'button', now)
 
     case 'remind_tomorrow': {
-      const t = timings(ctx, u)
-      setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+      setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
       const u2 = fresh(ctx, u)
       await ctx.send.text(u2, 'ev.not_today', commonVars(ctx, u2, now), kbs(ctx).homeKb())
       return
@@ -746,7 +772,7 @@ async function onDue(ctx: Ctx, u: UserRow, kind: DueKind, now: number): Promise<
         // Строка 21: процесс лежал ночью. Вопрос «а сейчас как» в семь утра про
         // вчерашнюю практику — хуже молчания; ждём утреннего догона.
         const morning = t.morningAt(u, now)
-        setDue(ctx, u, 'awaiting_after', morning ?? t.nextEvening(u, now), morning ? 'morning' : 'ping_or_close')
+        setDue(ctx, u, 'awaiting_after', morning ?? nextPingAt(ctx, u, now), morning ? 'morning' : 'ping_or_close')
         return
       }
       return askAfter(ctx, u, s, now)
@@ -757,7 +783,7 @@ async function onDue(ctx: Ctx, u: UserRow, kind: DueKind, now: number): Promise<
       // Догон ровно один на сессию: второе «а как ночь?» подряд превращает
       // заботу в опрос.
       if (s.nudged === 1 || t.demo) {
-        setDue(ctx, u, 'awaiting_after', t.nextEvening(u, now), 'ping_or_close')
+        setDue(ctx, u, 'awaiting_after', nextPingAt(ctx, u, now), 'ping_or_close')
         return
       }
       return morningNudge(ctx, u, s, now)
@@ -804,7 +830,7 @@ async function onPing(ctx: Ctx, u: UserRow, now: number): Promise<void> {
   const ritual = t.ritualDate(u, now)
   if (ctx.repo.sessions.countedOn(u.id, ritual)) {
     // Вечер на эту дату уже прошёл (человек нажал «Практика сейчас» раньше пинга).
-    setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+    setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
     return
   }
 
@@ -816,7 +842,7 @@ async function onPing(ctx: Ctx, u: UserRow, now: number): Promise<void> {
       ctx.repo.events.add(u.id, 'evening_skipped', now, { evening_no: u.current_evening + 1, silent: true })
     })()
     const u2 = fresh(ctx, u)
-    setDue(ctx, u2, 'idle', timings(ctx, u2).nextEvening(u2, now), 'ping')
+    setDue(ctx, u2, 'idle', nextPingAt(ctx, u2, now), 'ping')
     return
   }
 

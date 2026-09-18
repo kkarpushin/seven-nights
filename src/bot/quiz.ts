@@ -30,7 +30,7 @@ export function quizAfterAvailable(ctx: Ctx, u: UserRow): boolean {
 }
 
 /** Шаг 5 финала (§3.5): отдельное сообщение с предложением. */
-export async function offerQuizAfter(ctx: Ctx, user: UserRow, now: number): Promise<void> {
+export async function offerQuizAfter(ctx: Ctx, user: UserRow, _now: number): Promise<void> {
   const u = fresh(ctx, user)
   if (!quizAfterAvailable(ctx, u)) return
   await ctx.send.text(u, 'quiz.offer', { quiz_index: u.quiz_index ?? 0 }, kbs(ctx).quizOfferKb())
@@ -49,7 +49,7 @@ export async function quizStart(ctx: Ctx, user: UserRow, now: number): Promise<v
 }
 
 /** Строка 44 §3.2: «Не сейчас» — больше не предлагаем. */
-export async function quizDecline(ctx: Ctx, user: UserRow, now: number, msgId?: number): Promise<void> {
+export async function quizDecline(ctx: Ctx, user: UserRow, _now: number, msgId?: number): Promise<void> {
   const u = fresh(ctx, user)
   ctx.repo.quiz.decline(u.id)
   if (u.state === 'quiz_after') ctx.repo.users.update(u.id, { state: 'completed' })
@@ -58,7 +58,7 @@ export async function quizDecline(ctx: Ctx, user: UserRow, now: number, msgId?: 
 }
 
 /** Вопрос {k} из семи. Формат — из ключа quiz.question, тексты — из quiz.qN. */
-export async function askQuestion(ctx: Ctx, user: UserRow, q: number, now: number): Promise<void> {
+export async function askQuestion(ctx: Ctx, user: UserRow, q: number, _now: number): Promise<void> {
   const u = fresh(ctx, user)
   const text = ctx.texts.render('quiz.question', {
     k: q,

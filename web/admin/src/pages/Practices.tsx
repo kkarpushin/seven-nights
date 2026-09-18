@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api.ts'
 import { useData } from '../lib/useData.ts'
-import { CATEGORY_LABEL, fmtDuration } from '../lib/format.ts'
+import { CATEGORY_LABEL, fmtDuration, fmtPlays } from '../lib/format.ts'
 import { PageHeader } from '../components/AppShell.tsx'
 import {
   Button, Chip, EmptyState, ErrorState, Field, inputClass, SkeletonRows, useToast,
@@ -128,7 +128,7 @@ export function Practices() {
                   <div className="mt-2">
                     <TelegramStatus practice={p} />
                   </div>
-                  <p className="mt-1 text-[12px] text-ink3">Слушали {p.plays} раз</p>
+                  <p className="mt-1 text-[12px] text-ink3">Слушали {fmtPlays(p.plays)}</p>
                 </div>
 
                 <div className="flex shrink-0 flex-col items-end gap-2">

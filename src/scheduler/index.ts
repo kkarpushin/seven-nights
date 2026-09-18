@@ -18,7 +18,7 @@ import type { DueKind, UserRow } from '../db/types.ts'
 import { notifyRaw } from '../bot/notify.ts'
 import { applyRecompute } from './plan.ts'
 import { handleDue, settleDue, type DueOutcome, type SchedulerFlow } from './due.ts'
-import { runSweeps, type SweepOptions, type SweepResult } from './sweeps.ts'
+import { reviveStuckPrompts, runSweeps, type SweepOptions, type SweepResult } from './sweeps.ts'
 
 /** На сколько сдвигается срок при захвате: упавший обработчик повторится через это время. */
 export const PARK_SEC = 120
@@ -206,7 +206,7 @@ function disableDue(ctx: Ctx, u: UserRow, now: number): void {
 
 // ───────────────────────────── восстановление после перезапуска ─────────────────────────────
 
-export type RecoveryResult = { closedSessions: number; fixedUsers: number }
+export type RecoveryResult = { closedSessions: number; fixedUsers: number; revivedPrompts: number }
 
 /**
  * Проход §4.5.3: сверка активных сессий с users.active_session_id.
@@ -216,7 +216,7 @@ export type RecoveryResult = { closedSessions: number; fixedUsers: number }
  * разными аудио и непредсказуемый выбор в шаговых апдейтах.
  */
 export function recoverOnStart(ctx: Ctx): RecoveryResult {
-  const out: RecoveryResult = { closedSessions: 0, fixedUsers: 0 }
+  const out: RecoveryResult = { closedSessions: 0, fixedUsers: 0, revivedPrompts: 0 }
   const now = ctx.clock.now()
   const byUser = new Map<number, number[]>()
   for (const s of ctx.repo.sessions.allActive()) {
@@ -247,7 +247,14 @@ export function recoverOnStart(ctx: Ctx): RecoveryResult {
     out.fixedUsers += 1
   }
 
-  if (out.closedSessions > 0 || out.fixedUsers > 0) ctx.log.warn('восстановление сессий', out)
+  // Пинг, записанный перед падением процесса и не дошедший до человека (§4.4,
+  // рубеж 2). Без этого прохода вечер потерялся бы молча: состояние ждёт цифру,
+  // а вопроса человек не видел.
+  out.revivedPrompts = reviveStuckPrompts(ctx, now)
+
+  if (out.closedSessions > 0 || out.fixedUsers > 0 || out.revivedPrompts > 0) {
+    ctx.log.warn('восстановление сессий', out)
+  }
   return out
 }
 
@@ -269,6 +276,14 @@ export type SchedulerHandle = {
   /** Прогнать тик немедленно — для recovery-прохода при старте и для отладки. */
   tickNow(): Promise<TickResult>
   sweepNow(): Promise<SweepResult>
+  /** Когда закончился последний тик; null — ни одного ещё не было. Для GET /healthz (§10.3). */
+  lastTickAt(): number | null
+  /**
+   * Дождаться прохода, который сейчас в полёте. Нужно при остановке: тик уже
+   * ЗАБРАЛ задачу сдвигом due_at (§4.4), и если оборвать его на середине, человек
+   * получит своё сообщение только через PARK_SEC, а не в срок.
+   */
+  drain(): Promise<void>
 }
 
 export function startScheduler(ctx: Ctx, deps: SchedulerDeps): SchedulerHandle {
@@ -280,30 +295,57 @@ export function startScheduler(ctx: Ctx, deps: SchedulerDeps): SchedulerHandle {
   // работа в сети нам ни к чему.
   let tickRunning = false
   let sweepRunning = false
+  let lastTickAt: number | null = null
+  // Проход в полёте держим промисом, а не только флагом: остановка обязана его
+  // дождаться, а по одному флагу дождаться нечего.
+  let inFlight: Array<Promise<unknown>> = []
 
-  const runTick = async (): Promise<TickResult> => {
-    if (tickRunning) return emptyResult()
-    tickRunning = true
-    try {
-      return await tick(ctx, ctx.clock.now(), deps.flow, deps.dispatch ?? 'scheduler')
-    } catch (err) {
-      ctx.log.error('тик планировщика упал целиком', { err })
-      return emptyResult()
-    } finally {
-      tickRunning = false
-    }
+  const track = <T>(p: Promise<T>): Promise<T> => {
+    inFlight.push(p)
+    void p.finally(() => {
+      inFlight = inFlight.filter((x) => x !== p)
+    })
+    return p
   }
 
-  const runSweep = async (): Promise<SweepResult> => {
+  const runTick = (): Promise<TickResult> => {
+    if (tickRunning) return Promise.resolve(emptyResult())
+    tickRunning = true
+    return track(
+      (async () => {
+        try {
+          return await tick(ctx, ctx.clock.now(), deps.flow, deps.dispatch ?? 'scheduler')
+        } catch (err) {
+          ctx.log.error('тик планировщика упал целиком', { err })
+          return emptyResult()
+        } finally {
+          lastTickAt = ctx.clock.now()
+          tickRunning = false
+        }
+      })(),
+    )
+  }
+
+  const runSweep = (): Promise<SweepResult> => {
     if (sweepRunning) {
-      return { silent: 0, notifications: { sent: 0, failed: 0, skipped: 0 }, adminSessions: 0, backup: false }
+      return Promise.resolve({
+        silent: 0,
+        revivedPrompts: 0,
+        notifications: { sent: 0, failed: 0, skipped: 0 },
+        adminSessions: 0,
+        backup: false,
+      })
     }
     sweepRunning = true
-    try {
-      return await runSweeps(ctx, ctx.clock.now(), deps.sweeps ?? {})
-    } finally {
-      sweepRunning = false
-    }
+    return track(
+      (async () => {
+        try {
+          return await runSweeps(ctx, ctx.clock.now(), deps.sweeps ?? {})
+        } finally {
+          sweepRunning = false
+        }
+      })(),
+    )
   }
 
   const tickTimer = setInterval(() => void runTick(), tickMs)
@@ -318,6 +360,11 @@ export function startScheduler(ctx: Ctx, deps: SchedulerDeps): SchedulerHandle {
     },
     tickNow: runTick,
     sweepNow: runSweep,
+    lastTickAt: () => lastTickAt,
+    async drain() {
+      // Проходов больше одного не бывает, но ждём все: свип мог начаться одновременно.
+      while (inFlight.length > 0) await Promise.allSettled([...inFlight])
+    },
   }
 }
 
@@ -341,5 +388,5 @@ export async function loadFlow(specifier = '../bot/flow.ts'): Promise<SchedulerF
 }
 
 export { handleDue, settleDue, type SchedulerFlow, type DueOutcome } from './due.ts'
-export { runSweeps, sweepSilence, maybeBackup } from './sweeps.ts'
+export { runSweeps, sweepSilence, reviveStuckPrompts, maybeBackup } from './sweeps.ts'
 export * as plan from './plan.ts'

@@ -13,7 +13,7 @@ import { adminTgIds, flushNotifications, MAX_DELIVERY_ATTEMPTS } from '../src/bo
 import { loadFlow, recoverOnStart, tick } from '../src/scheduler/index.ts'
 import { handleDue, type SchedulerFlow } from '../src/scheduler/due.ts'
 import { recompute } from '../src/scheduler/plan.ts'
-import { sweepSilence } from '../src/scheduler/sweeps.ts'
+import { reviveStuckPrompts, sweepSilence } from '../src/scheduler/sweeps.ts'
 import { createRepos, type Ctx } from '../src/ctx.ts'
 import { fakeClock } from '../src/clock.ts'
 import { makeUser, seedTestPractices, T0, testDb } from './helpers/db.ts'
@@ -539,6 +539,61 @@ describe('фоновые проходы', () => {
     const ctx = ctxWithDoubles({ env: { adminTgIds: [999] } })
     ctx.settings.set('admin_tg_ids', '777, 999, 888')
     expect(adminTgIds(ctx)).toEqual([999, 777, 888])
+  })
+})
+
+describe('пинг, записанный но не отправленный (§4.4, рубеж 2)', () => {
+  /** Сессия, у которой prompt_sent_at есть, а message_id нет: процесс умер между ними. */
+  function stuck(minutesAgo: number, ritual = '2025-09-16') {
+    const { ctx, flow, user } = setup({ state: 'awaiting_before', current_evening: 2 })
+    const at = T0 - minutesAgo * 60
+    const s = ctx.repo.sessions.open({
+      userId: user.id, runNo: 1, kind: 'evening', eveningNo: 3, ritualDate: ritual, now: at,
+    })
+    ctx.repo.sessions.setPromptSent(s.id, at)
+    ctx.repo.users.setDue(user.id, { at: T0 + 3600, kind: 'skip_deadline' })
+    return { ctx, flow, user, session: s, promptAt: at }
+  }
+
+  it('через десять минут пустая сессия снимается и вечер планируется заново', async () => {
+    const { ctx, flow, user, session, promptAt } = stuck(15)
+
+    expect(reviveStuckPrompts(ctx, T0)).toBe(1)
+
+    expect(ctx.repo.sessions.byId(session.id)).toBeUndefined()
+    const u = currentUser(ctx, user.id)
+    expect(u.state).toBe('idle')
+    expect(u.due_kind).toBe('ping')
+    expect(u.due_at).toBe(promptAt)
+
+    // Обычный тик доводит дело до конца: вечер уходит человеку с опозданием.
+    await tick(ctx, T0, flow)
+    expect(keys(ctx.outbox)).toEqual(['ev.before'])
+    expect(currentUser(ctx, user.id).state).toBe('awaiting_before')
+  })
+
+  it('свежий пинг не трогаем: Telegram бывает медленным', () => {
+    const { ctx, session } = stuck(3)
+    expect(reviveStuckPrompts(ctx, T0)).toBe(0)
+    expect(ctx.repo.sessions.byId(session.id)).toBeDefined()
+  })
+
+  it('если ритуальные сутки уже сменились, вечер засчитывается пропуском, а не шлётся утром', async () => {
+    const { ctx, flow, user } = stuck(15 * 60, '2025-09-15') // пинг был вчера вечером
+    reviveStuckPrompts(ctx, T0)
+
+    const res = await tick(ctx, T0, flow)
+
+    expect(res.outcomes.silent).toBe(1)
+    expect(ctx.outbox).toHaveLength(0)
+    expect(currentUser(ctx, user.id).consecutive_skips).toBe(1)
+  })
+
+  it('сессию с уже полученной цифрой «до» проход не трогает', () => {
+    const { ctx, session } = stuck(30)
+    ctx.repo.sessions.setBefore(session.id, 5, T0 - 1700)
+    expect(reviveStuckPrompts(ctx, T0)).toBe(0)
+    expect(ctx.repo.sessions.byId(session.id)).toBeDefined()
   })
 })
 

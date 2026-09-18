@@ -12,7 +12,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, ReferenceLine,
+  Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { CATEGORY_COLOR, CATEGORY_LABEL, fmtNum, fmtWeekday, fmtPeople } from '../lib/format.ts'
@@ -74,7 +74,7 @@ export function ChartCard({
 }) {
   const [showNumbers, setShowNumbers] = useState(false)
   return (
-    <section className="rounded-[16px] border border-line bg-surface p-4 md:p-5">
+    <section className="min-w-0 overflow-hidden rounded-[16px] border border-line bg-surface p-4 md:p-5">
       <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
       {subtitle && <p className="mt-0.5 mb-3 text-[13px] text-ink2">{subtitle}</p>}
       {legend && <Legend items={legend} />}
@@ -130,9 +130,9 @@ export function FunnelBars({ reach, total }: { reach: Array<{ evening: number; p
       table={data.map((d) => [d.evening, `${d.people} · ${Math.round((d.people / base) * 100)}%`])}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, left: 0, bottom: 0 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid horizontal={false} stroke={GRID} />
-          <XAxis type="number" hide domain={[0, base]} />
+          <XAxis type="number" hide domain={[0, base * 1.34]} />
           <YAxis type="category" dataKey="evening" width={78} {...axisProps} axisLine={false} />
           <Tooltip
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
@@ -257,7 +257,8 @@ export function ActivityBars({ rows }: { rows: Array<{ date: string; evening: nu
             y={avg}
             stroke={AXIS}
             strokeDasharray="4 4"
-            label={{ value: `в среднем ${fmtNum(avg, 0)}`, position: 'right', fill: INK3, fontSize: 11 }}
+            // Подпись внутри области графика: справа от неё её обрезает край карточки на телефоне.
+            label={{ value: `в среднем ${fmtNum(avg, 0)}`, position: 'insideTopRight', fill: INK3, fontSize: 11 }}
           />
           <Tooltip
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
@@ -297,44 +298,35 @@ export function CategoryBars({ rows }: { rows: Array<{ category: Category; n: nu
     n: rows.find((r) => r.category === c)?.n ?? 0,
   }))
 
+  // Три полоски рисуются вёрсткой, а не библиотекой: подпись с эмодзи не влезает
+  // на ось и переносится, а три доли на круге на телефоне не сравнить глазом.
   return (
-    <ChartCard
-      title="Какие состояния выбирают"
-      subtitle="Все практики за период"
-      empty={total === 0 ? 'Пока никто не выбирал состояние.' : undefined}
-      table={data.map((d) => [d.label, `${d.n} · ${total === 0 ? '0%' : Math.round((d.n / total) * 100) + '%'}`])}
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 80, left: 0, bottom: 0 }}>
-          <CartesianGrid horizontal={false} stroke={GRID} />
-          <XAxis type="number" hide domain={[0, Math.max(total, 1)]} />
-          <YAxis type="category" dataKey="label" width={170} {...axisProps} axisLine={false} />
-          <Bar dataKey="n" radius={[0, 4, 4, 0]} barSize={22} isAnimationActive={false}>
-            {data.map((d) => (
-              <Cell key={d.category} fill={CATEGORY_COLOR[d.category]} />
-            ))}
-            <LabelList
-              dataKey="n"
-              position="right"
-              content={(props: unknown) => {
-                const p = props as { x?: number; y?: number; width?: number; height?: number; value?: number }
-                const value = Number(p.value ?? 0)
-                return (
-                  <text
-                    x={(p.x ?? 0) + (p.width ?? 0) + 8}
-                    y={(p.y ?? 0) + (p.height ?? 0) / 2 + 4}
-                    fill="var(--color-ink2)"
-                    fontSize={12}
-                  >
-                    {`${value} · ${total === 0 ? 0 : Math.round((value / total) * 100)}%`}
-                  </text>
-                )
-              }}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
+    <section className="rounded-[16px] border border-line bg-surface p-4 md:p-5">
+      <h2 className="text-[16px] font-semibold text-ink">Какие состояния выбирают</h2>
+      <p className="mt-0.5 mb-4 text-[13px] text-ink2">Все практики за период</p>
+      {total === 0 ? (
+        <p className="py-8 text-center text-[14px] text-ink3">Пока никто не выбирал состояние.</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {data.map((d) => (
+            <div key={d.category}>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[14px]">
+                <span className="text-ink">{d.label}</span>
+                <span className="tnum shrink-0 text-ink2">
+                  {d.n} · {Math.round((d.n / total) * 100)}%
+                </span>
+              </div>
+              <div className="h-[22px] overflow-hidden rounded-[4px] bg-raised">
+                <div
+                  className="h-full rounded-[4px]"
+                  style={{ width: `${(d.n / total) * 100}%`, background: CATEGORY_COLOR[d.category] }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

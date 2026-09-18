@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api.ts'
 import { useData } from '../lib/useData.ts'
-import { fmtAgo, fmtDateFull, fmtNum, fmtPeople, WAITING_LABEL } from '../lib/format.ts'
+import { fmtAgo, fmtDate, fmtNum, fmtPeople, fmtPeopleDative, WAITING_LABEL } from '../lib/format.ts'
 import { PageHeader } from '../components/AppShell.tsx'
 import { Card, EmptyState, ErrorState, Segmented, Skeleton, StatTile } from '../components/ui.tsx'
 import { ActivityBars, BeforeAfterBars, CategoryBars, FunnelBars } from '../components/charts.tsx'
@@ -28,7 +28,7 @@ export function Dashboard({ showDemo }: { showDemo: boolean }) {
         state.data
           ? state.data.period.days === null
             ? 'за всё время'
-            : `с ${fmtDateFull(state.data.period.from)} по ${fmtDateFull(state.data.period.to)}`
+            : `с ${fmtDate(state.data.period.from)} по ${fmtDate(state.data.period.to)}`
           : ' '
       }
       action={
@@ -126,7 +126,7 @@ export function Dashboard({ showDemo }: { showDemo: boolean }) {
           note={
             d.gainPeople === 0
               ? 'пока не по кому считать'
-              : `считаю по ${fmtPeople(d.gainPeople)}, у кого есть обе цифры`
+              : `считаю по ${fmtPeopleDative(d.gainPeople)}, у кого есть обе цифры`
           }
           tone="accent"
         />
@@ -141,8 +141,8 @@ export function Dashboard({ showDemo }: { showDemo: boolean }) {
         <p className="mt-4 rounded-[12px] border border-line bg-surface px-4 py-3 text-[14px] text-ink2">
           Индекс опоры: на входе <span className="tnum text-ink">{fmtNum(s.quiz.in_avg, 0)}</span> · после семи
           вечеров <span className="tnum text-ink">{fmtNum(s.quiz.out_avg, 0)}</span> · прирост{' '}
-          <span className="tnum text-ink">{fmtNum(s.quiz.gain, 0, true)}</span> (по {fmtPeople(s.quiz.both)}, кто
-          прошёл оба замера)
+          <span className="tnum text-ink">{fmtNum(s.quiz.gain, 0, true)}</span> (по {fmtPeopleDative(s.quiz.both)},
+          кто прошёл оба замера)
         </p>
       )}
 

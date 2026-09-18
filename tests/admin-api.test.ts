@@ -69,6 +69,51 @@ describe('вход', () => {
     }
   })
 
+  it('без куки закрыты и записывающие маршруты, а не только чтение', async () => {
+    const ctx = testCtx()
+    const app = createApp(ctx)
+    const calls: Array<[string, string]> = [
+      ['POST', '/api/admin/users/1/pause'],
+      ['POST', '/api/admin/users/1/demo'],
+      ['POST', '/api/admin/users/1/message'],
+      ['DELETE', '/api/admin/users/1'],
+      ['POST', '/api/admin/practices'],
+      ['PATCH', '/api/admin/practices/1'],
+      ['POST', '/api/admin/practices/1/audio'],
+      ['POST', '/api/admin/practices/reorder'],
+      ['PUT', '/api/admin/texts/onb.welcome'],
+      ['POST', '/api/admin/texts/onb.welcome/reset'],
+      ['PUT', '/api/admin/settings'],
+      ['POST', '/api/admin/settings/test-notification'],
+      ['POST', '/api/admin/notifications/1/retry'],
+    ]
+    for (const [method, path] of calls) {
+      const res = await app.request(path, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: method === 'DELETE' ? undefined : '{}',
+      })
+      expect(res.status, `${method} ${path}`).toBe(401)
+    }
+  })
+
+  it('отказ после перебора говорит, сколько ждать — экран показывает это число', async () => {
+    const ctx = testCtx()
+    const app = createApp(ctx)
+    const attempt = (password: string) =>
+      app.request('/api/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.0.0.9' },
+        body: JSON.stringify({ password }),
+      })
+    for (let i = 0; i < 5; i++) await attempt('nope')
+    const res = await attempt('nope')
+    const body = await res.json()
+    expect(res.status).toBe(429)
+    expect(body.secondsLeft).toBeGreaterThan(0)
+    expect(body.secondsLeft).toBeLessThanOrEqual(15 * 60)
+  })
+
   it('неверный пароль — 401 с человеческой строкой, верный — кука', async () => {
     const ctx = testCtx()
     const app = createApp(ctx)

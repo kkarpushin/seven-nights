@@ -6,7 +6,7 @@
  * отказом в работе, а не ограничением интерфейса.
  */
 
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { Button } from './ui.tsx'
 
@@ -31,9 +31,6 @@ export function AppShell({
   onLogout: () => void
   onDemoOff: () => void
 }) {
-  const location = useLocation()
-  const title = NAV.find((n) => n.to === location.pathname)?.label ?? 'Семь ночей'
-
   return (
     <div className="min-h-screen bg-page">
       {demoOn && (
@@ -83,9 +80,10 @@ export function AppShell({
         </aside>
 
         <div className="min-w-0 flex-1">
-          {/* Телефон: имя экрана сверху. */}
+          {/* Телефон: словесный знак сверху. Имя экрана не дублируем — оно ниже
+              заголовком страницы, и два одинаковых слова подряд читаются как ошибка. */}
           <header className="flex items-center justify-between px-4 py-4 md:hidden">
-            <span className="text-[18px] font-semibold text-ink">{title}</span>
+            <span className="font-serif text-[19px] text-ink">Семь ночей</span>
             <button
               type="button"
               onClick={onLogout}

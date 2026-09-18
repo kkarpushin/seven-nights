@@ -56,7 +56,8 @@ export function fmtPercent(part: number, whole: number): string {
 }
 
 export function fmtDuration(sec: number | null | undefined): string {
-  if (!sec) return '—'
+  // Ноль это «0:00», а не «—»: в плеере прочерк на месте позиции выглядит поломкой.
+  if (sec === null || sec === undefined) return '—'
   const m = Math.floor(sec / 60)
   const s = Math.round(sec % 60)
   return `${m}:${String(s).padStart(2, '0')}`
@@ -78,6 +79,15 @@ export function plural(n: number, forms: [string, string, string]): string {
 
 export function fmtPeople(n: number): string {
   return `${n} ${plural(n, ['человек', 'человека', 'человек'])}`
+}
+
+/** «по 1 человеку», «по 18 людям» — дательный падеж, он нужен в подписях под цифрами. */
+export function fmtPeopleDative(n: number): string {
+  return `${n} ${plural(n, ['человеку', 'людям', 'людям'])}`
+}
+
+export function fmtPlays(n: number): string {
+  return `${n} ${plural(n, ['раз', 'раза', 'раз'])}`
 }
 
 export const dots = (n: number): string => '●'.repeat(Math.max(0, Math.min(7, n))) + '○'.repeat(Math.max(0, 7 - n))

@@ -65,7 +65,7 @@ export async function handleFreeText(
   const saved = !isMedia && raw !== '' ? recordMessage(ctx, u, raw, now) : { id: 0, long: false }
 
   if (NUMBER_STATES.has(u.state)) {
-    await ctx.send.text(u, numberRetryKey(ctx, raw, isMedia, saved.long), numberRetryVars(raw, vars), K.numbersKb())
+    await ctx.send.text(u, numberRetryKey(raw, isMedia, saved.long), numberRetryVars(raw, vars), K.numbersKb())
     return
   }
 
@@ -96,7 +96,7 @@ export async function handleFreeText(
 }
 
 /** §2.6: у каждого вида «не цифры» свой ответ — это и есть разница между ботом и формой. */
-function numberRetryKey(ctx: Ctx, raw: string, isMedia: boolean, long: boolean): string {
+function numberRetryKey(raw: string, isMedia: boolean, long: boolean): string {
   if (long) return 'num.long_text'
   if (isMedia || raw.trim() === '') return 'num.not_number'
   const res = parseNumber(raw)

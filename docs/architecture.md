@@ -555,6 +555,12 @@ startScheduler(ctx):
   каждые 5 минут: await sweeps(ctx)   // молчание + очередь уведомлений + чистка admin_sessions
 ```
 
+`SchedulerHandle` отдаёт, кроме `stop/tickNow/sweepNow`, ещё две вещи — их использует точка входа:
+`lastTickAt(): number | null` (время конца последнего тика, уходит в `GET /healthz`) и
+`drain(): Promise<void>` — дождаться прохода в полёте. Останавливать планировщик, не дождавшись
+тика, нельзя: тик уже ЗАБРАЛ задачу сдвигом `due_at` (§4.4), и оборванный проход отдаёт человеку
+его сообщение не в срок, а через `PARK_SEC`.
+
 `tick(ctx, now)`:
 
 ```
@@ -1503,6 +1509,11 @@ FFPROBE_BIN=/home/karpushin/.local/bin/ffprobe
 | `GET /healthz` | `{ ok, uptimeSec, users, dueBacklog, lastTickAt, botUsername }` — без авторизации, для монитора |
 
 Слушаем `BIND_HOST:PORT` (`<адрес-хоста>:3700`) — снаружи tailnet порт недоступен. Публичный домен добавится Caddy-прокси позже, тогда же `ADMIN_COOKIE_SECURE=1`.
+
+`startHttp` возвращает, кроме `close()`, ещё `ready: Promise<void>` — резолвится на `listening`,
+падает на `EADDRINUSE`. Точка входа ждёт его **до** планировщика и long polling: занятый порт —
+единственный замок, по которому второй экземпляр узнаёт о первом (§10.4). Проигравший пишет
+«порт занят — «Семь ночей» уже запущены» и выходит с кодом 1, не тикнув и не отправив ничего.
 
 ### 10.4 systemd (`deploy/seven-nights.service`, уже написан)
 

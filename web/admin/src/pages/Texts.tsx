@@ -110,6 +110,9 @@ function TextCard({ row, onChanged }: { row: TextRow; onChanged: (row: TextRow) 
   const areaRef = useRef<HTMLTextAreaElement | null>(null)
   const toast = useToast()
   const isButton = row.key.startsWith('btn.')
+  // В белом списке ключа рядом с «{time}» встречается голое «time» — для проверки
+  // это одно и то же, но чип «time» предлагал бы вставить то, что бот не подставит.
+  const placeholders = row.placeholder_list.filter((p) => p.startsWith('{') && p.endsWith('}'))
 
   async function save() {
     if (value === row.value) return
@@ -181,9 +184,9 @@ function TextCard({ row, onChanged }: { row: TextRow; onChanged: (row: TextRow) 
         />
       )}
 
-      {row.placeholder_list.length > 0 && (
+      {placeholders.length > 0 && (
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-          {row.placeholder_list.map((p) => (
+          {placeholders.map((p) => (
             <button
               key={p}
               type="button"

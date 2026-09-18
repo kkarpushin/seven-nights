@@ -10,6 +10,22 @@ import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api.ts'
 import { Button, Field, inputClass } from '../components/ui.tsx'
 
+/** «через минуту» / «через 12 минут» — то, что реально ответил сервер. */
+function minutesWord(seconds: number): string {
+  const m = Math.ceil(seconds / 60)
+  if (m <= 1) return 'минуту'
+  const forms: [string, string, string] = ['минуту', 'минуты', 'минут']
+  const mod100 = m % 100
+  const mod10 = m % 10
+  const form = mod100 >= 11 && mod100 <= 14 ? forms[2] : mod10 === 1 ? forms[0] : mod10 >= 2 && mod10 <= 4 ? forms[1] : forms[2]
+  return `${m} ${form}`
+}
+
+function countdown(seconds: number): string {
+  if (seconds < 90) return `${seconds} с`
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
 export function Login({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
@@ -40,8 +56,13 @@ export function Login({ onDone }: { onDone: () => void }) {
       onDone()
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
-        setLockLeft(60)
-        setError('Слишком много попыток. Попробуй через минуту.')
+        // Сервер держит паузу 15 минут (§6.1) и сам говорит, сколько осталось.
+        // Показываем именно его число: «попробуй через минуту» на десятой минуте —
+        // это обещание, которое экран не может выполнить.
+        const left = Number(err.payload.secondsLeft)
+        const seconds = Number.isFinite(left) && left > 0 ? Math.ceil(left) : 60
+        setLockLeft(seconds)
+        setError(`Слишком много попыток. Попробуй через ${minutesWord(seconds)}.`)
       } else if (err instanceof ApiError && err.code === 'offline') {
         setError('Сервер не отвечает. Попробуй обновить страницу.')
       } else {
@@ -96,7 +117,7 @@ export function Login({ onDone }: { onDone: () => void }) {
 
         <div className="mt-5">
           <Button type="submit" kind="accent" full disabled={busy || lockLeft > 0}>
-            {busy ? 'Вхожу…' : lockLeft > 0 ? `Подожди ${lockLeft} с` : 'Войти'}
+            {busy ? 'Вхожу…' : lockLeft > 0 ? `Подожди ${countdown(lockLeft)}` : 'Войти'}
           </Button>
         </div>
 

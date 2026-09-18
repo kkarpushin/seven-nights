@@ -124,7 +124,7 @@ export function User() {
             {card.sessions.filter((s) => s.kind === 'evening').length === 0 ? (
               <p className="py-3 text-center text-[14px] text-ink3">Вечеров пока не было.</p>
             ) : (
-              <table className="w-full text-[13px]">
+              <table className="hidden w-full text-[13px] md:table">
                 <thead>
                   <tr className="text-left text-ink3">
                     <th className="py-2 font-normal">Вечер</th>
@@ -141,7 +141,7 @@ export function User() {
                     .map((s) => (
                       <tr key={s.id} className="border-t border-line">
                         <td className="tnum py-2">{s.evening_no}</td>
-                        <td className="py-2 text-ink2">{s.ritual_date}</td>
+                        <td className="py-2 text-ink2">{fmtDate(Date.parse(`${s.ritual_date}T12:00:00Z`) / 1000)}</td>
                         <td className="tnum py-2">{s.before_value ?? '—'}</td>
                         <td className="tnum py-2">{s.after_value ?? '—'}</td>
                         <td className="py-2 text-ink2">{afterSourceText(s.after_source, s.done_after_sec)}</td>
@@ -150,6 +150,27 @@ export function User() {
                 </tbody>
               </table>
             )}
+
+            {/* Телефон: та же таблица карточками — пять колонок на 390px не читаются. */}
+            <div className="flex flex-col gap-2 md:hidden">
+              {card.sessions
+                .filter((s) => s.kind === 'evening')
+                .sort((a, b) => (a.evening_no ?? 0) - (b.evening_no ?? 0))
+                .map((s) => (
+                  <div key={s.id} className="rounded-[12px] border border-line px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[14px] text-ink">Вечер {s.evening_no}</span>
+                      <span className="tnum text-[14px] text-ink">
+                        {s.before_value ?? '—'} → {s.after_value ?? '—'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[12px] text-ink3">
+                      {fmtDate(Date.parse(`${s.ritual_date}T12:00:00Z`) / 1000)} ·{' '}
+                      {afterSourceText(s.after_source, s.done_after_sec)}
+                    </div>
+                  </div>
+                ))}
+            </div>
           </Card>
 
           <Card title="Разговор" subtitle="Слева бот, справа человек">
@@ -255,7 +276,7 @@ export function User() {
                   Было {card.quiz.before.index ?? '—'} → стало {card.quiz.after.index ?? '—'}
                 </p>
                 <p className="mt-1 text-[13px] text-ink2">
-                  Первый замер {fmtDate(card.quiz.before.at)}
+                  {card.quiz.before.at ? `Первый замер ${fmtDate(card.quiz.before.at)}` : 'Первый замер пришёл с теста на сайте'}
                   {card.quiz.after.at ? `, второй ${fmtDate(card.quiz.after.at)}` : ', второго ещё не было'}
                 </p>
                 {card.quiz.after.answers.some((a) => a !== null) && (

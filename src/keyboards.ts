@@ -59,6 +59,15 @@ export function categoryOrder(localHour: number): Array<{ category: Category; ke
   return localHour < DAY_CATEGORY_SWITCH_HOUR ? [day, calm, sleep] : [sleep, calm, day]
 }
 
+/**
+ * Ключ подписи категории для текущего часа. Нужен не только клавиатуре: сообщение
+ * «Сегодня: …» после выбора обязано назвать категорию теми же словами, что были на
+ * кнопке, иначе человек решит, что нажал не туда.
+ */
+export function categoryLabelKey(category: Category, localHour: number): string {
+  return categoryOrder(localHour).find((c) => c.category === category)?.key ?? 'btn.cat_sleep'
+}
+
 export function createKeyboards(t: Texts): Keyboards {
   return {
     numbersKb(extra = {}) {

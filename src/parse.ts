@@ -30,10 +30,13 @@ export type Hm = { h: number; m: number }
 type DayPart = 'morning' | 'day' | 'evening' | 'night' | null
 
 function dayPartOf(s: string): DayPart {
-  if (/\bутр(о|а|ом)?\b/.test(s)) return 'morning'
-  if (/\b(дня|днем|днём|полдень)\b/.test(s)) return 'day'
-  if (/\bвечер(а|ом)?\b/.test(s)) return 'evening'
-  if (/\bноч(и|ью)\b/.test(s)) return 'night'
+  // Границы слова заданы просмотрами, а не \b: в JS \b считает буквой только
+  // латиницу, поэтому «\bутра\b» в строке «7 утра» не совпадает ни с чем, и
+  // уточнение времени суток молча перестаёт работать.
+  if (/(?<![а-яё])утр(о|а|ом)?(?![а-яё])/.test(s)) return 'morning'
+  if (/(?<![а-яё])(дня|днем|днём|полдень)(?![а-яё])/.test(s)) return 'day'
+  if (/(?<![а-яё])вечер(а|ом)?(?![а-яё])/.test(s)) return 'evening'
+  if (/(?<![а-яё])ноч(и|ью)(?![а-яё])/.test(s)) return 'night'
   return null
 }
 

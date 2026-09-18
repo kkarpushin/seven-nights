@@ -17,7 +17,7 @@ import type { Ctx } from '../ctx.ts'
 import type { AfterSource, Category, SessionRow, UserRow } from '../db/types.ts'
 import { bar, dots } from '../texts.ts'
 import { localHm } from '../time.ts'
-import { CATEGORY_LABEL_KEY } from '../db/settings.ts'
+import { categoryLabelKey } from '../keyboards.ts'
 import { pickPractice } from '../content/pick.ts'
 import { hasAudio, sendPractice } from '../content/audio.ts'
 import { chartData, chartSummary } from '../chart/data.ts'
@@ -25,11 +25,11 @@ import { renderChartPng } from '../chart/render.ts'
 import { notifyFinished, notifyNoPractices, notifyRaw } from './notify.ts'
 import {
   commonVars,
+  nextPingAt,
   eveningPromptKey,
   fresh,
   homeKbFor,
   kbs,
-  practiceDuration,
   prefixOf,
   recomputeDue,
   setDue,
@@ -62,7 +62,7 @@ export async function startEvening(
   // в базе лучше не доводить — ответ человеку был бы уже не в наших руках.
   if (ctx.repo.sessions.countedOn(u.id, ritual)) {
     ctx.log.warn('вечер на эту дату уже засчитан', { user_id: u.id, ritual_date: ritual })
-    setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+    setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
     return
   }
 
@@ -208,7 +208,7 @@ export async function deliverPractice(
       u,
       row.choice_msg_id,
       ctx.texts.render('ev.state_ack', {
-        category: ctx.texts.get(CATEGORY_LABEL_KEY[category]),
+        category: ctx.texts.get(categoryLabelKey(category, localHm(u, now).h)),
         title: practice.title,
       }),
     )
@@ -299,7 +299,7 @@ export async function askAfter(
           const morning = t.morningAt(u, now)
           return morning !== null && row.nudged === 0 && !opts.morning
             ? { at: morning, kind: 'morning' as const }
-            : { at: t.nextEvening(u, now), kind: 'ping_or_close' as const }
+            : { at: nextPingAt(ctx, u, now), kind: 'ping_or_close' as const }
         })()
 
   setDue(ctx, u, 'awaiting_after', due.at, due.kind)
@@ -411,7 +411,7 @@ export async function acceptAfter(
   }
 
   const u2 = fresh(ctx, u)
-  setDue(ctx, u2, 'idle', timings(ctx, u2).nextEvening(u2, now), 'ping')
+  setDue(ctx, u2, 'idle', nextPingAt(ctx, u2, now), 'ping')
 
   const u3 = fresh(ctx, u2)
   let text = ctx.texts.render('ev.close', {
@@ -571,7 +571,7 @@ export async function skipEvening(
   if (session?.prompt_msg_id) await ctx.send.clearInline(u, session.prompt_msg_id)
 
   const u2 = fresh(ctx, u)
-  setDue(ctx, u2, 'idle', timings(ctx, u2).nextEvening(u2, now), 'ping')
+  setDue(ctx, u2, 'idle', nextPingAt(ctx, u2, now), 'ping')
 }
 
 /**
@@ -595,7 +595,7 @@ export async function declineEvening(
   })()
 
   const u2 = fresh(ctx, u)
-  setDue(ctx, u2, 'idle', timings(ctx, u2).nextEvening(u2, now), 'ping')
+  setDue(ctx, u2, 'idle', nextPingAt(ctx, u2, now), 'ping')
 
   const u3 = fresh(ctx, u2)
   const K = kbs(ctx)

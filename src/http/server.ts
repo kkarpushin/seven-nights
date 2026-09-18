@@ -165,13 +165,34 @@ export function createApp(ctx: Ctx, hooks: ServerHooks = {}): Hono {
   return app
 }
 
-export type HttpServer = { close(): Promise<void> }
+export type HttpServer = {
+  /**
+   * Резолвится, когда порт действительно наш, и падает на EADDRINUSE.
+   *
+   * Это не удобство, а защита §10.4: порт — единственный замок, по которому второй
+   * экземпляр узнаёт о первом. Точка входа ждёт его ДО того, как включит планировщик
+   * и long polling, иначе проигравший успевает тикнуть и отправить чужие сообщения.
+   */
+  ready: Promise<void>
+  close(): Promise<void>
+}
 
 export function startHttp(ctx: Ctx, hooks: ServerHooks = {}): HttpServer {
   const app = createApp(ctx, hooks)
   const server = serve({ fetch: app.fetch, port: ctx.cfg.port, hostname: ctx.cfg.bindHost })
-  ctx.log.info('http listening', { host: ctx.cfg.bindHost, port: ctx.cfg.port })
+
+  // serve() вызывает listen() синхронно, а 'listening'/'error' приходят следующим
+  // тиком — подписаться успеваем.
+  const ready = new Promise<void>((resolve, reject) => {
+    server.once('listening', () => {
+      ctx.log.info('http listening', { host: ctx.cfg.bindHost, port: ctx.cfg.port })
+      resolve()
+    })
+    server.once('error', (err: Error) => reject(err))
+  })
+
   return {
+    ready,
     close: () =>
       new Promise<void>((done) => {
         server.close(() => done())

@@ -18,6 +18,7 @@ import type { Ctx, Sender } from '../ctx.ts'
 import type { UserRow, UserState } from '../db/types.ts'
 import { CATEGORIES } from '../db/types.ts'
 import { isPauseWord, parseCommand, parseNumber } from '../parse.ts'
+import { createTexts } from '../texts.ts'
 import { createSender } from './send.ts'
 import { handle, type Trigger } from './flow.ts'
 import { handleCommand } from './admin-cmds.ts'
@@ -104,15 +105,21 @@ function ensureUser(ctx: Ctx, tgId: number, languageCode: string | undefined, no
 export type CreateBotOptions = {
   /** Тесты и превью подставляют свой Sender; по умолчанию — настоящий поверх bot.api. */
   sender?: Sender
-  /** botInfo, чтобы не ходить в сеть за getMe в тестах. */
-  botInfo?: ConstructorParameters<typeof Bot>[1] extends { botInfo?: infer B } ? B : never
 }
 
 export function createBot(ctx: Ctx, opts: CreateBotOptions = {}): Bot {
-  const bot = opts.botInfo ? new Bot(ctx.cfg.telegramBotToken, { botInfo: opts.botInfo }) : new Bot(ctx.cfg.telegramBotToken)
+  const bot = new Bot(ctx.cfg.telegramBotToken)
 
-  // Sender — единственная дверь в Telegram (§5.5). Ctx собирается раньше бота,
-  // поэтому дверь вставляется здесь, когда появился api.
+  // Ctx собирается раньше текстов и бота (§5.1) и держит на их местах заглушки,
+  // которые бросают при первом вызове. Реестр текстов подключаем здесь, если его
+  // ещё не подключили: иначе первая же отправка падает не там, где причина.
+  try {
+    ctx.texts.get('btn.done')
+  } catch {
+    ctx.texts = createTexts(ctx.repo.texts, { log: ctx.log })
+  }
+
+  // Sender — единственная дверь в Telegram (§5.5): появляется вместе с api бота.
   ctx.send = opts.sender ?? createSender(ctx, bot.api)
 
   bot.catch((err) => {

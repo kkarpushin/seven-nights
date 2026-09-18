@@ -13,7 +13,7 @@
 import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Ctx } from '../ctx.ts'
-import type { UserRow } from '../db/types.ts'
+import type { SessionRow, UserRow } from '../db/types.ts'
 import { vacuumInto } from '../db/index.ts'
 import { flushNotifications, notifySilent, type FlushResult } from '../bot/notify.ts'
 
@@ -29,10 +29,18 @@ const LIVE_STATES = "('idle','awaiting_before','awaiting_state','practicing','aw
 
 export type SweepResult = {
   silent: number
+  revivedPrompts: number
   notifications: FlushResult
   adminSessions: number
   backup: boolean
 }
+
+/**
+ * Порог из §4.4, рубеж 2: пинг, записанный больше десяти минут назад и так и не
+ * получивший message_id, считается неотправленным. Меньший порог означал бы риск
+ * послать вечер дважды из-за медленного Telegram.
+ */
+export const STUCK_PROMPT_SEC = 600
 
 export type SweepOptions = {
   /** Подменяется в тестах; по умолчанию — ctx.send.toAdmins. */
@@ -44,6 +52,7 @@ export type SweepOptions = {
 export async function runSweeps(ctx: Ctx, now: number, opts: SweepOptions = {}): Promise<SweepResult> {
   const out: SweepResult = {
     silent: 0,
+    revivedPrompts: 0,
     notifications: { sent: 0, failed: 0, skipped: 0 },
     adminSessions: 0,
     backup: false,
@@ -53,6 +62,12 @@ export async function runSweeps(ctx: Ctx, now: number, opts: SweepOptions = {}):
     out.silent = sweepSilence(ctx, now)
   } catch (err) {
     ctx.log.error('проход по молчащим не удался', { err })
+  }
+
+  try {
+    out.revivedPrompts = reviveStuckPrompts(ctx, now)
+  } catch (err) {
+    ctx.log.error('проход по недоотправленным пингам не удался', { err })
   }
 
   try {
@@ -118,6 +133,62 @@ export function sweepSilence(ctx: Ctx, now: number): number {
       if (queued) n += 1
     } catch (err) {
       ctx.log.error('не смогли поставить уведомление о молчании', { user_id: u.id, err })
+    }
+  }
+  return n
+}
+
+/**
+ * Пинги, которые записаны, но не отправлены. §4.4, рубеж 2.
+ *
+ * prompt_sent_at пишется ДО вызова Telegram — иначе падение между отправкой и
+ * записью дало бы человеку два вечера. Обратная сторона: если процесс умер (или
+ * сеть отвалилась) МЕЖДУ записью и отправкой, человек сидит в состоянии
+ * «жду цифру» и не видел вопроса. Сам он не напишет — он вообще не знает, что
+ * его о чём-то спросили.
+ *
+ * Признак такой сессии однозначен: срок записан, message_id нет, цифры «до» нет,
+ * аудио не уходило. Возвращаем человека в ожидание вечера и ставим срок на тот
+ * момент, на который пинг и планировался: дальше сработает обычный обработчик и
+ * сам решит — послать вечер с опозданием или молча засчитать пропуск, если
+ * ритуальные сутки уже сменились.
+ *
+ * Пустую сессию удаляем: в статистике «начатых вечеров» она была бы вечером,
+ * которого человек не видел.
+ */
+export function reviveStuckPrompts(ctx: Ctx, now: number): number {
+  const rows = ctx.db
+    .prepare(`
+      SELECT s.* FROM sessions s
+        JOIN users u ON u.id = s.user_id
+       WHERE s.status = 'active'
+         AND s.kind = 'evening'
+         AND s.prompt_sent_at IS NOT NULL
+         AND s.prompt_sent_at < ?
+         AND s.prompt_msg_id IS NULL
+         AND s.before_value IS NULL
+         AND s.practice_sent_at IS NULL
+         AND u.state IN ('awaiting_before','awaiting_state')
+       LIMIT 100
+    `)
+    .all(now - STUCK_PROMPT_SEC) as SessionRow[]
+
+  let n = 0
+  for (const s of rows) {
+    const u = ctx.repo.users.byId(s.user_id)
+    if (!u || u.active_session_id !== s.id) continue
+    try {
+      ctx.repo.sessions.deleteSession(s.id)
+      ctx.repo.users.setState(u.id, 'idle', { at: s.prompt_sent_at, kind: 'ping' })
+      ctx.log.warn('пинг записан, но не отправлен — планируем заново', {
+        user_id: u.id,
+        session_id: s.id,
+        evening_no: s.evening_no,
+        prompt_sent_at: s.prompt_sent_at,
+      })
+      n += 1
+    } catch (err) {
+      ctx.log.error('не смогли переназначить недоотправленный пинг', { user_id: u.id, err })
     }
   }
   return n

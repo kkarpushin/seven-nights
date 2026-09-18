@@ -18,7 +18,7 @@ import type { UserRow, UserState } from '../db/types.ts'
 import { parseClock, parseHour, parseStartPayload } from '../parse.ts'
 import { guessOffsetByLanguage, minutesToHm, offsetFromLocalClock } from '../time.ts'
 import { notifyStarted } from './notify.ts'
-import { commonVars, fresh, kbs, recomputeDue, setDue, timings } from './flow.ts'
+import { commonVars, fresh, kbs, nextPingAt, recomputeDue, setDue, timings } from './flow.ts'
 import { startEvening } from './evening.ts'
 
 /** Гипотеза пояса: язык клиента, а при смене времени — то, что уже известно про человека. */
@@ -143,7 +143,7 @@ export async function finishOnboarding(ctx: Ctx, user: UserRow, now: number): Pr
     return
   }
 
-  setDue(ctx, u, 'idle', t.nextEvening(u, now), 'ping')
+  setDue(ctx, u, 'idle', nextPingAt(ctx, u, now), 'ping')
   const u2 = fresh(ctx, u)
   await ctx.send.text(u2, 'onb.done_later', commonVars(ctx, u2, now), kbs(ctx).homeKb())
 }
