@@ -2,7 +2,7 @@
 slug: day-tune
 title: Настроить день
 category: day
-duration_hint: 5
+duration_hint: 10
 intro:
   - Утренняя. Пять минут до того, как откроешь всё остальное.
   - Сидя, глаза можно закрыть.

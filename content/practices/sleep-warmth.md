@@ -2,7 +2,7 @@
 slug: sleep-warmth
 title: Тепло по телу
 category: sleep
-duration_hint: 6
+duration_hint: 10
 intro:
   - Сегодня идём по телу — от стоп до макушки.
   - Если где-то не чувствуется — так бывает, идём дальше.

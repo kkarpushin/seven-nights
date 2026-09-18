@@ -2,7 +2,7 @@
 slug: day-talk
 title: Перед разговором
 category: day
-duration_hint: 5
+duration_hint: 9
 intro:
   - Перед разговором, который важен. Пять минут, сидя.
   - Глаза можно не закрывать.

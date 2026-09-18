@@ -2,7 +2,7 @@
 slug: calm-ground
 title: Пять вещей вокруг
 category: calm
-duration_hint: 5
+duration_hint: 9
 intro:
   - "Эта — с открытыми глазами, прямо там, где ты."
   - "Пять минут, ничего закрывать и ложиться не нужно."

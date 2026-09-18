@@ -2,7 +2,7 @@
 slug: sleep-release
 title: Отпустить день
 category: sleep
-duration_hint: 6
+duration_hint: 10
 intro: |
   Сегодня — сначала немного напрячься, чтобы по-настоящему отпустить.
   Если что-то болит — эту часть пропускай.

@@ -2,7 +2,7 @@
 slug: sleep-landing
 title: Приземление
 category: sleep
-duration_hint: 7
+duration_hint: 10
 intro:
   - Сегодня — самая простая. Ложись, наушники, свет можно выключить.
   - Если уснёшь до конца — так и надо.

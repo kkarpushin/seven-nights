@@ -118,5 +118,20 @@
     "hash": "3c7e790103936019",
     "chars": 2203,
     "generatedAt": "2026-09-18T08:05:02.594Z"
+  },
+  "sleep-warmth": {
+    "slug": "sleep-warmth",
+    "title": "Тепло по телу",
+    "category": "sleep",
+    "intro": [
+      "Сегодня идём по телу — от стоп до макушки.",
+      "Если где-то не чувствуется — так бывает, идём дальше."
+    ],
+    "duration": 604,
+    "voice": "ru-RU-SvetlanaNeural",
+    "style": "",
+    "hash": "aad633b5f0863640",
+    "chars": 3138,
+    "generatedAt": "2026-09-18T08:05:48.775Z"
   }
 }

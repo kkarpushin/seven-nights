@@ -2,7 +2,7 @@
 slug: calm-sigh
 title: Два вдоха и выдох
 category: calm
-duration_hint: 5
+duration_hint: 9
 intro:
   - Четыре минуты, можно сидя, хоть на работе.
   - Два вдоха носом, один длинный выдох ртом — я покажу.
