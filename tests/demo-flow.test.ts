@@ -204,3 +204,62 @@ describe('цифра, присланная раньше вопроса', () => {
     expect(user(OTHER).evening_no).toBe(1)
   })
 })
+
+describe('тяжёлое сообщение', () => {
+  const ID = 777003
+  const who = { ...from, id: ID }
+  const where = { ...chat, id: ID }
+  const say = (t: string) => bot.handleUpdate({ update_id: updateId++, message: msg(t, who, where) } as any)
+
+  it('получает мягкий отклик, а не вопрос про цифру', async () => {
+    await say('/start')
+    await say('21:00')
+    await say('18:42')          // бот ждёт цифру «до»
+    sent.length = 0
+    await say('я не хочу жить')
+    const texts = sent.map((s) => s.payload.text || '').join('\n')
+    expect(texts).toContain('это звучит тяжело')
+    expect(texts).not.toContain('нужна просто цифра')
+  })
+
+  it('обычная грусть не вызывает кризисный текст', async () => {
+    sent.length = 0
+    await say('день был тяжёлый, устала очень')
+    const texts = sent.map((s) => s.payload.text || '').join('\n')
+    expect(texts).not.toContain('это звучит тяжело')
+  })
+})
+
+describe('удаление истории', () => {
+  const ID = 777004
+  const who = { ...from, id: ID }
+  const where = { ...chat, id: ID }
+  const say = (t: string) => bot.handleUpdate({ update_id: updateId++, message: msg(t, who, where) } as any)
+  const press = (data: string) =>
+    bot.handleUpdate({
+      update_id: updateId++,
+      callback_query: {
+        id: String(updateId), from: who, chat_instance: '1', data,
+        message: { message_id: updateId, date: Math.floor(Date.now() / 1000), chat: where, text: '.' },
+      },
+    } as any)
+
+  it('спрашивает подтверждение и стирает всё только после «да»', async () => {
+    await say('/start')
+    await say('21:00')
+    await say('18:42')
+    await say('5')
+    expect((db.prepare('SELECT COUNT(*) c FROM users WHERE tg_id = ?').get(ID) as any).c).toBe(1)
+
+    sent.length = 0
+    await say('/delete')
+    expect(sent.map((s) => s.payload.text || '').join()).toContain('Отменить это будет нельзя')
+
+    await press('del:no')
+    expect((db.prepare('SELECT COUNT(*) c FROM users WHERE tg_id = ?').get(ID) as any).c).toBe(1)
+
+    await press('del:yes')
+    expect((db.prepare('SELECT COUNT(*) c FROM users WHERE tg_id = ?').get(ID) as any).c).toBe(0)
+    expect((db.prepare('SELECT COUNT(*) c FROM evenings WHERE tg_id = ?').get(ID) as any).c).toBe(0)
+  })
+})

@@ -169,6 +169,23 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many
 }
 
+/**
+ * Маркеры сообщений, на которые нельзя отвечать «Передала».
+ * Список короткий сознательно: ложное срабатывание здесь хуже пропуска — человек,
+ * которому просто грустно, получит неуместно тревожный текст.
+ */
+const CRISIS_MARKERS = [
+  'не хочу жить', 'не хочется жить', 'незачем жить', 'жить незачем',
+  'покончить с собой', 'покончу с собой', 'убить себя', 'убью себя',
+  'суицид', 'не вижу смысла жить', 'хочу умереть', 'хочу сдохнуть',
+  'причинить себе вред', 'навредить себе', 'порезать себя',
+]
+
+const looksLikeCrisis = (t: string) => {
+  const low = t.toLowerCase()
+  return CRISIS_MARKERS.some((m) => low.includes(m))
+}
+
 const T = {
   welcome:
     'Привет. Это «Семь ночей»: семь вечеров подряд, каждый вечер одна аудиопрактика. ' +
@@ -177,6 +194,15 @@ const T = {
     'Это практики для самоподдержки. Они не лечат и не заменяют врача или психотерапевта. ' +
     'Если тяжело дольше нескольких недель — стоит поговорить со специалистом.',
   safety: 'Слушай дома, лёжа или сидя. Не за рулём и не там, где нужно внимание.',
+  crisis:
+    'Я тебя слышу, и это звучит тяжело. Если сейчас правда очень плохо — это важнее любой практики. ' +
+    'Пожалуйста, не оставайся с этим один на один: напиши тому, кому доверяешь, или обратись за помощью сегодня. ' +
+    'Я передала твоё сообщение.',
+  deleteAsk:
+    'Сотру всё, что у меня про тебя есть: удобный час, номер вечера и все цифры. ' +
+    'Отменить это будет нельзя. Точно?',
+  deleteDone: 'Стёрла. Ничего про тебя у меня не осталось. Если захочешь начать заново — напиши /start.',
+  deleteNo: 'Хорошо, ничего не трогаю.',
   quizIndex: (i: number) => `Твой индекс опоры сейчас ${i} из ста. Это точка отсчёта, к ней вернёмся через семь вечеров.`,
   hourAsk: 'Во сколько вечером тебе удобно получать практику?',
   hourRetry: 'Напиши час как на часах, например 21:30.',
@@ -502,6 +528,22 @@ bot.command('reset', async (ctx) => {
 
 bot.command('whoami', (ctx) => ctx.reply(`Твой Telegram ID: ${ctx.from!.id}`))
 
+bot.command('delete', async (ctx) => {
+  await ctx.reply(T.deleteAsk, {
+    reply_markup: new InlineKeyboard().text('Да, стереть', 'del:yes').text('Нет', 'del:no'),
+  })
+})
+
+bot.callbackQuery(/^del:(yes|no)$/, async (ctx) => {
+  await ctx.answerCallbackQuery()
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {})
+  if (ctx.match![1] === 'no') return void ctx.reply(T.deleteNo)
+  const tgId = ctx.from.id
+  db.prepare('DELETE FROM evenings WHERE tg_id = ?').run(tgId)
+  db.prepare('DELETE FROM users WHERE tg_id = ?').run(tgId)
+  await ctx.reply(T.deleteDone, { reply_markup: { remove_keyboard: true } })
+})
+
 bot.callbackQuery(/^cat:(.+)$/, async (ctx) => {
   const tgId = ctx.from.id
   const u = user(tgId)
@@ -531,6 +573,12 @@ bot.on('message:text', async (ctx) => {
   const tgId = ctx.from!.id
   const text = ctx.message.text
   const u = user(tgId)
+
+  // Раньше любого шага: человеку, который пишет такое, не нужен вопрос про цифру.
+  if (looksLikeCrisis(text)) {
+    await ctx.reply(T.crisis)
+    return
+  }
 
   if (text === 'Практика сейчас') {
     if (u.state === 'idle' || u.state === 'completed') {
@@ -576,7 +624,10 @@ bot.on('message:text', async (ctx) => {
       const n = parseNumber(text)
       if (n === null) return void ctx.reply(T.notNumber, { reply_markup: numbers() })
       if (n === 'out-of-range') return void ctx.reply(T.range, { reply_markup: numbers() })
-      set(tgId, { cur_before: n, state: 'awaiting_state' })
+      set(tgId, {
+        cur_before: n, state: 'awaiting_state',
+        due_at: now() + (u.demo ? 60 : 600), due_kind: 'category',
+      })
       const evening = new Date(localNow(u) * 1000).getUTCHours() >= 14
       await ctx.reply(T.beforeAck(n), { reply_markup: categoryKeyboard(evening) })
       return
@@ -618,6 +669,13 @@ export const tick = async () => {
       if (u.due_kind === 'evening') {
         set(u.tg_id, { due_at: null, due_kind: null })
         await askBefore(u.tg_id)
+      } else if (u.due_kind === 'category') {
+        // Не выбрал состояние — не повод терять вечер: молча даём сон.
+        set(u.tg_id, { due_at: null, due_kind: null })
+        if (u.state === 'awaiting_state') {
+          set(u.tg_id, { state: 'sending', cur_category: 'sleep' })
+          await sendPractice(u.tg_id, 'sleep')
+        }
       } else if (u.due_kind === 'after') {
         set(u.tg_id, { due_at: null, due_kind: null })
         if (u.state === 'practicing') await askAfter(u.tg_id)
