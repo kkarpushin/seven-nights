@@ -171,6 +171,21 @@
     return Math.round(sum / MAX_SUM * 100);
   }
 
+  /* Подсчёт вынесен наружу только для проверки: границы результата и индекс
+     должны быть воспроизводимы без клика по семи ползункам.
+     Страница этим объектом не пользуется — внутри всё зовётся напрямую. */
+  window.SevenNightsQuiz = {
+    maxSum: MAX_SUM,
+    total: TOTAL,
+    indexFor: indexFor,
+    resultTextFor: resultTextFor,
+    sumOf: function (answers) {
+      var sum = 0;
+      for (var i = 0; i < answers.length; i++) { sum += Number(answers[i]) || 0; }
+      return sum;
+    }
+  };
+
   /* Семь точек: сначала пробуем API из chart.js, иначе рисуем сами. */
   function paintDots(node, filled) {
     node.setAttribute('data-dots', String(TOTAL));
@@ -284,6 +299,12 @@
       sticky.setAttribute('href', href);
       sticky.textContent = 'Открыть в Telegram';
     }
+    /* Финальный призыв: до теста ведёт к тесту, после — сразу в бота (§A дизайна). */
+    var final = document.querySelector('.js-final-cta');
+    if (final) {
+      final.setAttribute('href', href);
+      final.textContent = 'Открыть семь вечеров в Telegram';
+    }
   }
 
   function resetDeepLink() {
@@ -295,6 +316,11 @@
     if (sticky) {
       sticky.setAttribute('href', '#quiz');
       sticky.textContent = 'Пройти тест';
+    }
+    var final = document.querySelector('.js-final-cta');
+    if (final) {
+      final.setAttribute('href', '#quiz');
+      final.textContent = 'Пройти тест · 2 минуты';
     }
   }
 
