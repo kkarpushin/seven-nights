@@ -106,7 +106,7 @@ Reply-кнопка «Практика сейчас» появляется зде
 
 Последняя строка (`ev.practice_sleep_hint`) добавляется **только для категории `sleep`**. [I: «Готово»]
 
-`state = practicing`, **вечер засчитан в момент успешной отправки аудио** (`current_evening = n`, `consecutive_skips = 0`), `due_at = practice_sent_at + max(20 мин, длительность + 2 мин)`.
+`state = practicing`, **вечер засчитан в момент успешной отправки аудио** (`current_evening = n`, `consecutive_skips = 0`), `due_at = practice_sent_at + max(12 мин, длительность + 3 мин)`.
 
 **Шаг 3. Замер «после»** — по кнопке «Готово», по таймеру, или по цифре, присланной без кнопки (человек поспешил — принимаем как «после», `after_source = early`):
 
@@ -287,7 +287,7 @@ Reply-кнопка «Практика сейчас» доступна в `idle`,
 | `idle` | ничего (дом) | момент вечернего пинга или сообщения дня 8 |
 | `awaiting_before` | цифру «до» | 04:00 локально (вечер) / +30 мин (сессия `now`) |
 | `awaiting_state` | нажатие категории | то же |
-| `practicing` | «Готово» / цифру / таймер | `max(20 мин, длительность + 2 мин)` от отправки аудио |
+| `practicing` | «Готово» / цифру / таймер | `max(12 мин, длительность + 3 мин)` от отправки аудио |
 | `awaiting_after` | цифру «после» | 10:00 следующего утра (вечер) / +3 ч (`now`) |
 | `paused` | «Продолжить» / «Практика сейчас» | — |
 | `completed` | «Практика сейчас» / «Ещё семь вечеров» | 10:00 следующего утра (день 8, один раз) |
@@ -335,7 +335,7 @@ Reply-кнопка «Практика сейчас» доступна в `idle`,
 
 **sessions**: `id`, `tg_id`, `run_no`, `kind` (`evening`|`now`), `evening_no` (null для `now`), `ritual_date`, `category`, `practice_id`, `before`, `before_at`, `after`, `after_at`, `after_source` (`button`|`timer`|`early`|`morning`|null), `nudged`, `status` (`active`|`done`|`abandoned`|`declined`), `prompt_msg_id`, `choice_msg_id`, `practice_msg_id`, `prompt_sent_at`, `practice_sent_at`, `closed_at`.
 
-**practices**: `id`, `category` (`sleep`|`stress`|`day`), `title`, `line1`, `line2`, `audio_path`, `tg_file_id`, `duration_sec`, `sort_order`, `active`.
+**practices**: `id`, `category` (`sleep`|`calm`|`day`), `title`, `line1`, `line2`, `audio_path`, `tg_file_id`, `duration_sec`, `sort_order`, `active`.
 **plays**: `tg_id`, `practice_id`, `played_at` — для правила выбора практики.
 **texts**: `key`, `value`, `placeholders`, `updated_at`.
 **settings**: `talk_url`, `channel_url`, `admin_tg_ids`, `default_tz_offset_min`, `allow_restart`, `demo_secret`.
@@ -347,7 +347,7 @@ Reply-кнопка «Практика сейчас» доступна в `idle`,
 ### 3.4 (ж) 20-минутное окно: когда считаем, что человек «сделал»
 
 - **Вечер засчитан в момент успешной отправки аудио.** Ни кнопка «Готово», ни замер «после» на это не влияют. Это и есть ответ на «человек сделал».
-- `due_at = practice_sent_at + max(20 мин, duration_sec + 2 мин)` — практика длиннее 20 минут не обрывается вопросом.
+- `due_at = practice_sent_at + max(12 мин, duration_sec + 3 мин)` — практика длиннее двенадцати минут не обрывается вопросом.
 - Сработал таймер → отправляем `ev.after`, `after_source = timer` (если ответ придёт), inline-«Готово» снимается.
 - Нажал «Готово» раньше → `after_source = button`. Прислал цифру, не нажав «Готово» → `after_source = early`, вопрос не задаём, сразу закрываем вечер.
 - Не ответил вовсе → утренний догон в 10:00 (`after_source = morning`), затем закрытие с `after = null`. **Вечер остаётся пройденным**, на графике у него есть точка «до» и нет точки «после».
@@ -369,7 +369,7 @@ Reply-кнопка «Практика сейчас» доступна в `idle`,
 
 | Параметр | Обычный режим | Демо |
 |---|---|---|
-| Таймер «после» практики | `max(20 мин, длит.+2)` | 1 мин |
+| Таймер «после» практики | `max(12 мин, длит.+3)` | 1 мин |
 | Следующий вечер | ближайшее `{time}` следующей ритуальной даты | +2 мин после закрытия вечера |
 | Срок пропуска (ответ на «до»/категорию) | 04:00 локально | 5 мин |
 | Таймаут `awaiting_before` сессии `now` | 30 мин | 2 мин |
@@ -551,7 +551,7 @@ Reply-кнопка «Практика сейчас» доступна в `idle`,
 | `btn.remind_tomorrow` | Завтра напомни |
 | `btn.resume` | Продолжить |
 | `btn.cat_sleep` | 😴 Сон и расслабление |
-| `btn.cat_stress` | 🌿 Тревога и стресс |
+| `btn.cat_calm` | 🌿 Тревога и стресс |
 | `btn.cat_day_morning` | 🌅 Настроиться на день |
 | `btn.cat_day_evening` | 🌅 Настроиться на завтра |
 | `btn.change_time` | Поменять время |

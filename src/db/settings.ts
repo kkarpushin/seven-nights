@@ -19,6 +19,8 @@ export type SettingsStore = {
   csvNumbers(key: string): number[]
   set(key: string, value: string | number | boolean | object): void
   setMany(patch: Record<string, string | number | boolean | object>): void
+  /** Засев: ставит значение, только если ключа ещё нет. true — ключ создан. */
+  seedDefault(key: string, value: string | number | boolean | object, now: number): boolean
   all(): Record<string, string>
   /** Типизированный снимок всех известных настроек — для GET /api/admin/settings. */
   snapshot(): SettingsSnapshot
@@ -51,7 +53,7 @@ function toText(value: string | number | boolean | object): string {
 
 export const CATEGORY_LABEL_KEY: Record<Category, string> = {
   sleep: 'btn.cat_sleep',
-  stress: 'btn.cat_stress',
+  calm: 'btn.cat_calm',
   day: 'btn.cat_day_evening',
 }
 
@@ -101,6 +103,12 @@ export function createSettingsStore(db: Db, clock: Clock): SettingsStore {
       return out
     },
     set: (key, value) => void upsert.run(key, toText(value), clock.now()),
+    // INSERT OR IGNORE, а не upsert: повторный `npm run seed` не имеет права
+    // вернуть настройку, которую владелец уже поменял в админке.
+    seedDefault: (key, value, now) =>
+      db.prepare('INSERT OR IGNORE INTO settings (key, value, updated_at) VALUES (?, ?, ?)').run(
+        key, toText(value), now,
+      ).changes > 0,
     setMany(patch) {
       const now = clock.now()
       db.transaction(() => {

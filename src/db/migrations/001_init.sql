@@ -74,7 +74,7 @@ CREATE TABLE sessions (
   kind            TEXT    NOT NULL CHECK (kind IN ('evening','now')),
   evening_no      INTEGER,                     -- 1..7 для evening, NULL для now
   ritual_date     TEXT    NOT NULL,            -- 'YYYY-MM-DD' локально, или 'demo-<n>' в демо
-  category        TEXT    CHECK (category IN ('sleep','stress','day')),
+  category        TEXT    CHECK (category IN ('sleep','calm','day')),
   practice_id     INTEGER REFERENCES practices(id) ON DELETE SET NULL,
 
   before_value    INTEGER CHECK (before_value BETWEEN 0 AND 10),
@@ -115,7 +115,7 @@ CREATE INDEX sessions_practice ON sessions(practice_id);
 CREATE TABLE practices (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   slug          TEXT NOT NULL UNIQUE,
-  category      TEXT NOT NULL CHECK (category IN ('sleep','stress','day')),
+  category      TEXT NOT NULL CHECK (category IN ('sleep','calm','day')),
   title         TEXT NOT NULL,
   line1         TEXT NOT NULL DEFAULT '',     -- две строки под аудио, ≤ 400 символов каждая
   line2         TEXT NOT NULL DEFAULT '',

@@ -15,7 +15,7 @@
 |---|---|---|
 | 1 | `design-bot.md` §3.3: `users.tg_id` — PK. `quiz-bot-integration.md` §6: `quiz_answers.user_id REFERENCES users(id)`. | У `users` суррогатный `id INTEGER PRIMARY KEY AUTOINCREMENT` + `tg_id INTEGER NOT NULL UNIQUE`. Все внешние ключи и админка — на `users.id`. Плейсхолдер `{id}` в уведомлениях владельцу = `users.id` («участник #17»), tg_id владельцу не показываем. |
 | 2 | `design-bot.md` §3.5: практика выбирается по «меньше всего слушал». `content-plan.md` §6: жёсткий маршрут сна 1→A, 2→B, 3→C, 4→D, 5→B, 6→C, 7→A, где 7-й вечер = 1-й (вау-момент «та же практика, а ты другой»). Правила несовместимы на вечерах 5–7. | **Маршрут старше.** Для `kind='evening' AND category='sleep'` практика берётся из `settings.sleep_route[evening_no]`, если она активна. Во всех остальных случаях (другие категории, `kind='now'`, маршрут пуст/практика выключена) — правило §3.5 «меньше всего слушал». Маршрут редактируется в админке. |
-| 3 | Задание оркестратора: озвучка ElevenLabs с ротацией `KEY_2..6`. `docs/tts-decision.md` (позже): бесплатный ElevenLabs не даёт русских голосов через API (HTTP 402), провайдер — **Azure AI Speech**. | Провайдер по умолчанию — Azure (`ru-RU-Masha:MAI-Voice-2`, стиль `caringempathy`). Ротация ключей ElevenLabs не реализуется. Генератор пишется за интерфейсом `TtsProvider`, ElevenLabs остаётся вторым провайдером «на потом» (§8.6). Скрипты `scripts/tts.ts` и `scripts/generate-audio.ts` уже написаны по этому решению — их не переписывать. |
+| 3 | Задание оркестратора: озвучка ElevenLabs с ротацией `KEY_2..6`. `docs/tts-decision.md` (позже): бесплатный ElevenLabs не даёт русских голосов через API (HTTP 402), провайдер — **Azure AI Speech**. | Провайдер по умолчанию — Azure (`ru-RU-SvetlanaNeural`, стиль `` (пусто)). Ротация ключей ElevenLabs не реализуется. Генератор пишется за интерфейсом `TtsProvider`, ElevenLabs остаётся вторым провайдером «на потом» (§8.6). Скрипты `scripts/tts.ts` и `scripts/generate-audio.ts` уже написаны по этому решению — их не переписывать. |
 | 4 | Задание: картинка 1200×800 или 1080×1350. `design-bot.md` §2.7: PNG 1200×1500, 4:5. | **1200×1500**, как в финальном дизайне (вертикаль для сторис). |
 | 5 | `design-bot.md` §2.1 упоминает ключ `onb.quiz_index`, `quiz-bot-integration.md` §3 — `onboarding.quiz_index`. | Канонический ключ — **`onb.quiz_index`**. Все ключи текстов приводятся к префиксам из Приложения А design-bot. |
 | 6 | Колонки `before` / `after` из §3.3. | В SQL называются `before_value` / `after_value` (в грамматике SQLite `BEFORE`/`AFTER` участвуют в триггерах; плюс так не нужны кавычки в запросах). В коде и в API — те же `before_value` / `after_value`, в UI админки — «до» / «после». |
@@ -216,7 +216,7 @@ CREATE TABLE sessions (
   kind            TEXT    NOT NULL CHECK (kind IN ('evening','now')),
   evening_no      INTEGER,                     -- 1..7 для evening, NULL для now
   ritual_date     TEXT    NOT NULL,            -- 'YYYY-MM-DD' локально, или 'demo-<n>' в демо
-  category        TEXT    CHECK (category IN ('sleep','stress','day')),
+  category        TEXT    CHECK (category IN ('sleep','calm','day')),
   practice_id     INTEGER REFERENCES practices(id) ON DELETE SET NULL,
 
   before_value    INTEGER CHECK (before_value BETWEEN 0 AND 10),
@@ -257,7 +257,7 @@ CREATE INDEX sessions_practice ON sessions(practice_id);
 CREATE TABLE practices (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   slug          TEXT NOT NULL UNIQUE,
-  category      TEXT NOT NULL CHECK (category IN ('sleep','stress','day')),
+  category      TEXT NOT NULL CHECK (category IN ('sleep','calm','day')),
   title         TEXT NOT NULL,
   line1         TEXT NOT NULL DEFAULT '',     -- две строки под аудио, ≤ 400 символов каждая
   line2         TEXT NOT NULL DEFAULT '',
@@ -442,7 +442,7 @@ CREATE INDEX admin_sessions_exp ON admin_sessions(expires_at);
 | 13 | `awaiting_before` | `btn.not_today` | `kind='evening'` | сессия `declined`, `not_today_streak++`; `ev.not_today`; при `not_today_streak ≥ 2` вместо него `ev.pause_offer` [R: «Пауза»/«Завтра напомни»] | `idle` | следующее `{time}`, `ping` |
 | 14 | `awaiting_before`/`awaiting_state` | `due.skip_deadline` | `kind='evening'` | сессия `abandoned` (введённое «до» сохраняется), `consecutive_skips++`, событие `evening_skipped`, снять inline-кнопки, **ничего не отправлять** | `idle` | сегодняшнее `{time}`, `ping` |
 | 15 | `awaiting_before`/`awaiting_state` | `due.now_timeout_before` | `kind='now'` | сессия удаляется (`DELETE`, чтобы не мусорить статистику), восстановить `state_before_now` | прежнее | восстановленный `due_at` |
-| 16 | `awaiting_state` | `cb.cat` | `sessionId` совпал с активной, `category IS NULL` (проверка и запись — в одной транзакции) | выбрать практику (§5.9); `edit` сообщения выбора → `ev.state_ack`, кнопки убраны; `sendChatAction upload_voice` 1,5 с; `sendAudio`; в транзакции: `practice_sent_at`, `practice_msg_id`, `plays`, для `evening` — `current_evening = evening_no`, `consecutive_skips = 0`, `not_today_streak = 0`, события `practice_sent` | `practicing` | `practice_sent_at + max(20 мин, duration+2 мин)`, `after_timeout` |
+| 16 | `awaiting_state` | `cb.cat` | `sessionId` совпал с активной, `category IS NULL` (проверка и запись — в одной транзакции) | выбрать практику (§5.9); `edit` сообщения выбора → `ev.state_ack`, кнопки убраны; `sendChatAction upload_voice` 1,5 с; `sendAudio`; в транзакции: `practice_sent_at`, `practice_msg_id`, `plays`, для `evening` — `current_evening = evening_no`, `consecutive_skips = 0`, `not_today_streak = 0`, события `practice_sent` | `practicing` | `practice_sent_at + max(12 мин, duration+3 мин)`, `after_timeout` |
 | 17 | `awaiting_state` | `cb.cat` | шаг не совпал / категория уже выбрана | `answerCallbackQuery(cb.expired)`, снять клавиатуру | без изменений | — |
 | 18 | `awaiting_state` | `cb.cat` | активных практик нет вовсе | `err.no_practices`, сессия удаляется, уведомление `admin.no_practices`, событие `no_practices` | `state_before_now` / `idle` | прежний |
 | 19 | `practicing` | `cb.done` | `sessionId` активен | снять inline «Готово» (`editMessageReplyMarkup`), `{ev\|now}.after` [R: цифры] | `awaiting_after` | 10:00 след. утра (`morning`) / `now`: +3 ч (`now_timeout_after`) |
@@ -500,7 +500,7 @@ consecutive_skips >= 2              → ev.before_after_skips
 
 | Параметр | Обычный | Демо |
 |---|---|---|
-| `afterTimeout(duration)` | `max(20 мин, duration + 2 мин)` | 60 с |
+| `afterTimeout(duration)` | `max(12 мин, duration + 3 мин)` | 60 с |
 | `skipDeadline` | ближайшие 04:00 локально | `now + 5 мин` |
 | `nextEvening` | ближайшее `{time}` следующей ритуальной даты | `now + 2 мин` |
 | `nowBeforeTimeout` | 30 мин | 2 мин |
@@ -712,7 +712,7 @@ export type DueKind =
   | 'ping' | 'skip_deadline' | 'after_timeout' | 'morning' | 'ping_or_close'
   | 'now_timeout_before' | 'now_timeout_after' | 'day8' | 'retry'
 
-export type Category = 'sleep' | 'stress' | 'day'
+export type Category = 'sleep' | 'calm' | 'day'
 export type SessionKind = 'evening' | 'now'
 export type SessionStatus = 'active' | 'done' | 'abandoned' | 'declined'
 export type AfterSource = 'button' | 'timer' | 'early' | 'morning'
@@ -1341,8 +1341,8 @@ npm run audio:generate -- --voice ru-RU-SvetlanaNeural --style ""
 
 `content/audio/manifest.json`:
 ```json
-{ "sleep-landing": { "duration": 312.4, "voice": "ru-RU-Masha:MAI-Voice-2",
-                     "style": "caringempathy", "hash": "<sha256 тела сценария + параметров>",
+{ "sleep-landing": { "duration": 312.4, "voice": "ru-RU-SvetlanaNeural",
+                     "style": "", "hash": "<sha256 тела сценария + параметров>",
                      "bytes": 7512345, "generated_at": 1758100000 } }
 ```
 Совпал хеш — файл не трогаем и **не тратим квоту**. `--force` игнорирует манифест. Манифест — источник `duration_sec` для БД при синке (`syncPracticesFromFiles`).
@@ -1467,8 +1467,8 @@ TZ=UTC                         # обязательно: все расчёты �
 # озвучка (используются только скриптами, не сервисом)
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=westeurope
-TTS_VOICE=ru-RU-Masha:MAI-Voice-2
-TTS_STYLE=caringempathy
+TTS_VOICE=ru-RU-SvetlanaNeural
+TTS_STYLE=
 FFMPEG_BIN=/home/karpushin/.local/bin/ffmpeg
 FFPROBE_BIN=/home/karpushin/.local/bin/ffprobe
 ```

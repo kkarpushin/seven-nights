@@ -173,6 +173,10 @@ const T = {
   welcome:
     'Привет. Это «Семь ночей»: семь вечеров подряд, каждый вечер одна аудиопрактика. ' +
     'Ничего готовить не надо: наушники и кровать. Вечером я напишу, а в конце недели покажу, что изменилось.',
+  disclaimer:
+    'Это практики для самоподдержки. Они не лечат и не заменяют врача или психотерапевта. ' +
+    'Если тяжело дольше нескольких недель — стоит поговорить со специалистом.',
+  safety: 'Слушай дома, лёжа или сидя. Не за рулём и не там, где нужно внимание.',
   quizIndex: (i: number) => `Твой индекс опоры сейчас ${i} из ста. Это точка отсчёта, к ней вернёмся через семь вечеров.`,
   hourAsk: 'Во сколько вечером тебе удобно получать практику?',
   hourRetry: 'Напиши час как на часах, например 21:30.',
@@ -187,10 +191,11 @@ const T = {
   beforeLast: 'Добрый вечер. Седьмой вечер, последний. Как ты сейчас, от 0 до 10?',
   beforeAck: (v: number) => `Записала: ${v}  ${bar(v)}\nЧто сегодня ближе?`,
   stateAck: (label: string) => `Сегодня: ${label.toLowerCase()}`,
-  caption: (p: Practice, n: number) =>
+  caption: (p: Practice, n: number, first: boolean) =>
     'Ложись, надень наушники и просто слушай.\n\n' +
     `${p.intro[0] ?? ''}\n${p.intro[1] ?? ''}` +
-    (p.category === 'sleep' ? '\n\nЕсли уснёшь — хорошо. Утром спрошу, как ты.' : ''),
+    (p.category === 'sleep' ? '\n\nЕсли уснёшь — хорошо. Утром спрошу, как ты.' : '') +
+    (first ? `\n\n${T.safety}` : ''),
   after: 'А сейчас как, от 0 до 10?',
   deltaUp: (b: number, a: number) =>
     `Было ${b}, стало ${a}. На ${a - b} ${plural(a - b, 'деление', 'деления', 'делений')} легче.`,
@@ -272,7 +277,9 @@ function parseClock(text: string): { h: number; m: number } | null {
   let m = t.match(/^(\d{1,2}):(\d{2})/)
   if (!m) {
     const only = t.match(/^(\d{1,2})$/)
-    if (only) return { h: Number(only[1]), m: 0 }
+    // Человек написал только час. Ставить ноль минут нельзя: смещение округлится
+    // с ошибкой почти в час. Минуты у всех поясов одинаковые — берём текущие.
+    if (only) return { h: Number(only[1]), m: new Date().getUTCMinutes() }
     const four = t.match(/^(\d{2})(\d{2})$/)
     if (four) return { h: Number(four[1]), m: Number(four[2]) }
     return null
@@ -388,7 +395,7 @@ async function sendPractice(tgId: number, category: string) {
   const cached = (q.getFileId.get(p.slug) as { file_id: string } | undefined)?.file_id
   const audio = cached ?? new InputFile(join(AUDIO_DIR, `${p.slug}.mp3`))
   const msg = await bot.api.sendAudio(tgId, audio, {
-    caption: T.caption(p, n),
+    caption: T.caption(p, n, u.evening_no === 0),
     title: p.title,
     performer: isNow ? 'Семь ночей' : `Семь ночей · Вечер ${n}`,
     duration: p.duration,
@@ -463,6 +470,7 @@ bot.command('start', async (ctx) => {
   }
 
   await ctx.reply(T.welcome, { reply_markup: { remove_keyboard: true } })
+  await ctx.reply(T.disclaimer)
 
   // Пришёл с лендинга после теста: ?start=q42 — сумма ответов, индекс считаем сами.
   const m = payload.match(/^q(\d{1,2})$/)

@@ -512,7 +512,7 @@ export const DEFAULT_TEXTS: readonly TextDefault[] = [
     hint: 'Выход из паузы.' },
   { key: 'btn.cat_sleep', value: '😴 Сон и расслабление', placeholders: [], section: 'buttons',
     hint: 'Категория практики.' },
-  { key: 'btn.cat_stress', value: '🌿 Тревога и стресс', placeholders: [], section: 'buttons',
+  { key: 'btn.cat_calm', value: '🌿 Тревога и стресс', placeholders: [], section: 'buttons',
     hint: 'Категория практики.' },
   { key: 'btn.cat_day_morning', value: '🌅 Настроиться на день', placeholders: [], section: 'buttons',
     hint: 'Третья категория до 14:00 по местному времени человека.' },

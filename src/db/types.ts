@@ -47,8 +47,8 @@ export const DUE_KINDS: readonly DueKind[] = [
   'now_timeout_before', 'now_timeout_after', 'day8', 'retry',
 ]
 
-export type Category = 'sleep' | 'stress' | 'day'
-export const CATEGORIES: readonly Category[] = ['sleep', 'stress', 'day']
+export type Category = 'sleep' | 'calm' | 'day'
+export const CATEGORIES: readonly Category[] = ['sleep', 'calm', 'day']
 
 export type SessionKind = 'evening' | 'now'
 export type SessionStatus = 'active' | 'done' | 'abandoned' | 'declined'
