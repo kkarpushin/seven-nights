@@ -686,7 +686,7 @@ export type Env = {
   telegramBotToken: string
   adminPassword: string
   port: number                 // 3700
-  bindHost: string             // '100.91.124.2'
+  bindHost: string             // '<адрес-хоста>'
   adminTgIds: number[]         // из ADMIN_TG_IDS
   dataDir: string              // './data'
   dbPath: string               // `${dataDir}/seven-nights.db`
@@ -1320,7 +1320,7 @@ export function renderPng(svg: string): Buffer {
 
 ## 8. Аудио-пайплайн
 
-> **Провайдер — Azure AI Speech**, не ElevenLabs (см. §0, решение 3 и `docs/tts-decision.md`). Ключ: `~/.claude/secrets/azure-speech.env` (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION=westeurope`, тариф F0 ≈ 500 000 знаков/мес). Квота избыточна, поэтому перегенерация ничего не стоит и «права на ошибку нет» больше не действует.
+> **Провайдер — Azure AI Speech**, не ElevenLabs (см. §0, решение 3 и `docs/tts-decision.md`). Ключ: файл окружения с `AZURE_SPEECH_KEY` и `AZURE_SPEECH_REGION` (тариф F0 ≈ 500 000 знаков/мес). Квота избыточна, поэтому перегенерация ничего не стоит и «права на ошибку нет» больше не действует.
 
 ### 8.1 Источник — сценарии
 
@@ -1451,10 +1451,10 @@ export function cb(data: string, from = 1000): Update        // фейковый
 ### 10.1 `.env` (полный список; `.env.example` привести к нему)
 
 ```dotenv
-TELEGRAM_BOT_TOKEN=            # из ~/.claude/secrets/seven-nights.env, НИКОГДА не в git
+TELEGRAM_BOT_TOKEN=            # от @BotFather, НИКОГДА не в git
 ADMIN_PASSWORD=change-me       # пароль админки, минимум 12 символов
 PORT=3700
-BIND_HOST=100.91.124.2         # только tailnet, наружу не слушаем
+BIND_HOST=<адрес-хоста>         # только tailnet, наружу не слушаем
 ADMIN_TG_IDS=                  # id владельца и специалиста через запятую (узнать: /whoami в боте)
 DATA_DIR=./data
 CONTENT_DIR=./content
@@ -1502,7 +1502,7 @@ FFPROBE_BIN=/home/karpushin/.local/bin/ffprobe
 | `GET /media/practices/:file` | аудио для плеера админки (требует куки) |
 | `GET /healthz` | `{ ok, uptimeSec, users, dueBacklog, lastTickAt, botUsername }` — без авторизации, для монитора |
 
-Слушаем `BIND_HOST:PORT` (`100.91.124.2:3700`) — снаружи tailnet порт недоступен. Публичный домен добавится Caddy-прокси позже, тогда же `ADMIN_COOKIE_SECURE=1`.
+Слушаем `BIND_HOST:PORT` (`<адрес-хоста>:3700`) — снаружи tailnet порт недоступен. Публичный домен добавится Caddy-прокси позже, тогда же `ADMIN_COOKIE_SECURE=1`.
 
 ### 10.4 systemd (`deploy/seven-nights.service`, уже написан)
 

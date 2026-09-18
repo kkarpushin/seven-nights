@@ -1,7 +1,8 @@
 /**
- * Превью-сервер: отдаёт лендинг и образцы голосов по tailnet, пока проект собирается.
+ * Превью-сервер: отдаёт лендинг и образцы голосов, пока проект собирается.
  *
- *   npx tsx scripts/preview-server.ts          # 100.91.124.2:3701
+ *   npx tsx scripts/preview-server.ts          # слушает 0.0.0.0:3701
+ *   PREVIEW_PUBLIC_HOST=10.0.0.5 npx tsx scripts/preview-server.ts   # адрес в подсказке
  *
  * Это временная витрина для владельца, а НЕ боевой сервер бота — тот будет на 3700
  * и поднимется из src/. Здесь нет ни базы, ни админки, ни зависимостей.
@@ -61,5 +62,6 @@ createServer((req, res) => {
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
   res.end('Нет такой страницы. Есть / (лендинг) и /samples/ (голоса).')
 }).listen(PORT, HOST, () => {
-  console.log(`превью: http://100.91.124.2:${PORT}/  ·  голоса: http://100.91.124.2:${PORT}/samples/`)
+  const shown = process.env.PREVIEW_PUBLIC_HOST || (HOST === '0.0.0.0' ? '127.0.0.1' : HOST)
+  console.log(`превью: http://${shown}:${PORT}/  ·  голоса: http://${shown}:${PORT}/samples/`)
 })
